@@ -1,0 +1,352 @@
+#!/bin/bash
+
+# https://ddev.readthedocs.io/en/stable/users/extend/custom-commands/#annotations-supported
+## Description: Creates a complete WordPress including plugins and wp-cli packages
+## Usage: wordpress [flags] [args]
+## Example: "ddev wordpress" or "ddev wordpress -cliu" or "ddev wordpress -d"
+## CanRunGlobally: true
+
+#ddev-generated
+
+# create hooks in each project to trigger things like templating rewrites, updating cloudflare tunnels etc...
+# hooks:
+#   post-start:
+#     - exec: "simple command expression"
+#     - exec: "ls >/dev/null && touch /var/www/html/somefile.txt"
+#     - exec-host: "simple command expression"
+#   post-import-db:
+#     - exec: "drush uli"
+
+# pre-start:
+# Only exec-host tasks can run during pre-start because the containers are not yet running. See Supported Tasks below.
+# post-start: Execute tasks after the project environment has started.
+# pre-import-db
+# post-import-db: Execute tasks before or after database import.
+# pre-import-files
+# post-import-files: Execute tasks before or after files are imported.
+# pre-composer
+# post-composer: Execute tasks before or after the composer command.
+# pre-stop
+# post-stop: Hooks into ddev stop. Execute tasks a
+# pre-pause:
+# post-pause:
+# pre-config
+# post-config
+# pre-exec
+# post-exec
+# pre-pull
+# post-pull
+# pre-push
+# post-push
+# pre-snapshot
+# post-snapshot
+# pre-delete-snapshot
+# post-delete-snapshot
+# pre-restore-snapshot
+# post-restore-snapshot: Execute as the name suggests.
+prompt_for_input() {
+    local prompt="$1"
+    local var_name="$2"
+    while true; do
+        read -p "$prompt: " input
+        if [ -z "$input" ]; then
+            echo "$prompt is required."
+        else
+            eval "$var_name=\$input"
+            break
+        fi
+    done
+}
+
+show_help() {
+    echo "Creates a complete WordPress including plugins and wp-cli packages"
+    echo ""
+    echo "Usage:"
+    echo "  wordpress [flags]"
+    echo ""
+    echo "Examples:"
+    echo "ddev wordpress"
+    echo "ddev wordpress -cliu -clip -wpd"
+    echo ""
+    echo "Flags:"
+    echo "  -cliu, --cli-update     Updates WP-CLI to the latest release"
+    echo "  -clip, --cli-packages   Installs a WP-CLI package"
+    echo "  -d, --delete            Delete the old WordPress (without additional demand)"
+    echo "  -no, --no-install       There is no installation of WordPress"
+    echo "  -wpd, --wp-debug        Additional debug variables are set during the installation"
+    echo " "
+}
+
+download_install_wp() {
+
+    # if [ -f "/var/www/html/wp-config.php" ]; then
+    #     echo "WordPress is probably already installed. That's why I'd rather quit now."
+    #     exit 1
+    # fi
+    # while true; do
+    #     echo "
+    # Please enter site details. Press Ctrl+C at any time to cancel this command completely.
+    #     "
+    #     prompt_for_input "Site Title" WP_TITLE
+    #     prompt_for_input "Site Production URL" WP_URL
+    #     prompt_for_input "Admin User" WP_ADMIN_USER
+    #     prompt_for_input "Admin Password" WP_ADMIN_PASSWORD
+    #     prompt_for_input "Admin Email" WP_ADMIN_EMAIL
+
+    #     echo "
+    # You have entered the following details:
+    # "
+    #     echo "Site Title: $WP_TITLE"
+    #     echo "Site Production URL: $WP_URL"
+    #     echo "Admin User: $WP_ADMIN_USER"
+    #     echo "Admin Password: $WP_ADMIN_PASSWORD"
+    #     echo "Admin Email: $WP_ADMIN_EMAIL"
+    #     read -p "
+    # Are these details correct? (Y/n): " confirmation
+
+    #     if [ -z "$confirmation" ]; then
+    #         confirmation="yes"
+    #     fi
+
+    #     case ${confirmation,,} in
+    #     y | yes) break ;;
+    #     n | no) echo "
+    # Let's try again." ;;
+    #     *) echo "Please answer yes or no." ;;
+    #     esac
+    # done
+
+    # if [ -f "/var/www/html/wp-config.php" ]; then
+    #     echo "WordPress is probably already installed. That's why I'd rather quit now."
+    #     exit 1
+    # else
+
+    WP_TITLE="wp5"
+    WP_URL="wp5.com"
+    WP_ADMIN_USER="admin"
+    WP_ADMIN_PASSWORD="1357531"
+    WP_ADMIN_EMAIL="asdf@asdf.com"
+
+    echo "Download, Create and Install a fresh new WordPress..."
+
+    # TODO: remove this later
+    #ddev delete -O -y
+
+    ddev config --project-type=wordpress --web-environment-add="WP_ENVIRONMENT_TYPE=development,WPURL=$WP_URL" --disable-settings-management=true --php-version=8.1
+
+    # set WP_ENVIRONMENT_TYPE env variable just for this initial install, since it hasn't yet been set in config.yaml. This will allow the wp core install to use wp-config-development.php
+    # export WP_ENVIRONMENT_TYPE=development
+
+    # # add WP_ENVIRONMENT_TYPE to config.yaml, so that wp-config-development.php is used going forward. Sets it to "development", regardless of what it was before.
+
+    # # Remove any existing WP_ENVIRONMENT_TYPE entries and re-add it as development
+    # yq e 'del(.web_environment[] | select(test("WP_ENVIRONMENT_TYPE"))) ' -i .ddev/config.yaml
+    # yq e '.web_environment += ["WP_ENVIRONMENT_TYPE=development"]' -i .ddev/config.yaml
+
+    # Add the WPURL entry, set to the value provided as the production URL that is stored in the DB. This will be used by Traefik Middleware to rewrite URLs in the HTML response to be relative paths, such that any URL can be used to access the site while maintaining URL in DB as production - keeps the database consistent and clean, without any search/replace mess
+    # yq e 'del(.web_environment[] | select(test("WPURL"))) ' -i .ddev/config.yaml
+    # yq e ".web_environment += [\"WPURL=$WP_URL\"]" -i .ddev/config.yaml
+
+    # yq e ".disable_settings_management = false" -i .ddev/config.yaml
+
+    # set php to 8.1 because it has better compatibility with Wordpress
+    # as of WP 6.5, php 8.1 is "compatible, with exceptions" while 8.2 has "beta support"
+    # https://make.wordpress.org/core/handbook/references/php-compatibility-and-wordpress-versions/
+    # yq e '.php_version = "8.1"' -i .ddev/config.yaml
+
+    #set up our wp-config.php files
+
+    rm -f ./wp-config*.php
+    cp -f ~/.ddev/wordpress/wp-config.php ./wp-config.php
+    cp -f ~/.ddev/wordpress/wp-config-development.php ./wp-config-development.php
+    mkdir -p ./.ddev/traefik && cp -f ~/.ddev/wordpress/dynamic_config.middlewares.yaml ./.ddev/traefik/dynamic_config.middlewares.yaml
+
+    # change placeholder values in wp-config.php
+    ddev start
+
+    update_wp_config
+
+    ## download and install wordpress
+    ddev exec wp core download
+    ddev exec wp core install --url=$WP_URL --title=$WP_TITLE --admin_user=$WP_ADMIN_USER --admin_password=$WP_ADMIN_PASSWORD --admin_email=$WP_ADMIN_EMAIL --skip-email
+
+    ## empties a site of its content (posts, comments, terms, and meta)
+    ddev exec wp site empty --uploads --yes
+
+    ## delete all default plugins
+    ddev exec wp plugin delete --all
+
+    ## change permalinks
+    ddev exec wp option update permalink_structure '/%postname%/'
+
+    ## install and activate plugins
+    if [ -n "$WP_DDEV_PLUGINS" ]; then
+        ddev exec wp plugin install $WP_DDEV_PLUGINS --activate
+    fi
+
+    ## after installing all plugins, update the language
+    if [ -n "$WP_DDEV_LOCALE" ]; then
+        ddev exec wp language plugin install --all $WP_DDEV_LOCALE
+    fi
+
+    if [ -n "$DO_WP_FLAGS_CLIP" ]; then
+        ## install wp-cli packages
+        ddev exec wp package install $WP_DDEV_CLI_PACKAGES
+    fi
+
+    echo "************************************************************
+
+You MUST restart DDEV now - use the \`ddev restart\` command
+
+************************************************************"
+}
+
+update_wp_config() {
+    ddev exec wp config shuffle-salts
+
+    # Declare an associative array
+    declare -A replacements=(
+        ["{{ \$config.DatabaseName }}"]="db"
+        ["{{ \$config.DatabaseUsername }}"]="db"
+        ["{{ \$config.DatabasePassword }}"]="db"
+        ["{{ \$config.DbCharset }}"]="utf8mb4"
+        ["{{ \$config.DbCollate }}"]=""
+        ["{{ \$config.AbsPath }}"]="/var/www/html"
+        ["{{ \$config := . }}"]=""
+    )
+
+    file1="./wp-config.php"
+    file2="./wp-config-development.php"
+
+    # Convert associative array to positional parameters
+    args=()
+    for key in "${!replacements[@]}"; do
+        args+=("$key" "${replacements[$key]}")
+    done
+
+    # Perform replacements
+    sed_replace "$file1" "${args[@]}"
+    sed_replace "$file2" "${args[@]}"
+
+    echo "Replacements done."
+}
+
+sed_replace() {
+    local targetFile="$1"
+    shift
+    declare -A arr
+
+    while (($#)); do
+        key="${1//[\'\"]/}"
+        value="${2//[\'\"]/}"
+
+        # Check if key is non-empty
+        if [[ -n "$key" ]]; then
+            arr[$key]="$value"
+        fi
+
+        shift 2
+    done
+
+    for key in "${!arr[@]}"; do
+        sed -i "s|$key|${arr[$key]}|g" "$targetFile"
+    done
+}
+
+import_wp() {
+    touch asdf.txt
+    cp ~/.ddev/wordpress/zxcv.txt ./zxcv.txt
+    # Find SQL files and save to a variable
+    sql_files=$(find . -maxdepth 1 -type f -name "*.sql*")
+
+    # Check if any SQL files were found
+    if [ -n "$sql_files" ]; then
+        echo "Found SQL files:"
+        echo "$sql_files"
+        # You can now use $sql_files in your import logic
+        # For example, you might want to use the first file found:
+        # first_sql_file=$(echo "$sql_files" | head -n 1)
+        # ddev import-db --file="$first_sql_file"
+        ddev import-db --file="$sql_files"
+    else
+        echo "No SQL files found in the current directory."
+        # Fallback to the original import logic
+    fi
+
+}
+
+main() {
+    if [ $# -eq 0 ] || [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
+        show_help
+        exit 0
+    fi
+
+    case "$1" in
+    install)
+        download_install_wp
+        ;;
+    import)
+        import_wp
+        ;;
+    wpconfig)
+        update_wp_config
+        ;;
+    *)
+        show_help
+        exit 1
+        ;;
+    esac
+
+}
+
+main "$@"
+
+# DO_WP_FLAGS_CLIP=false
+# DO_WP_FLAGS_WPD=false
+# DO_WP_INSTALL=true
+
+# while :; do
+#     case ${1:-} in
+#          -h|-\?|--help)
+#             show_help
+#             exit
+#              ;;
+#          -cliu|--cli-update)
+#             echo "Updates the WP-CLI..."
+#             sudo wp cli update --stable --yes
+#             echo " "
+#              ;;
+#          -clip|--cli-packages)
+#             DO_WP_FLAGS_CLIP=true
+#              ;;
+#          -d|--delete)
+#             DO_WP_INSTALL=false
+#             echo "Delete the old WordPress..."
+#             mysql -e 'DROP DATABASE IF EXISTS db; CREATE DATABASE db;'
+#             rm -r /var/www/html/*
+# 			echo "Done with deleting!"
+#             echo " "
+#              ;;
+#          -no|--no-install)
+#             DO_WP_INSTALL=false
+#              ;;
+#          -wpd|--wp-debug)
+#             DO_WP_FLAGS_WPD=true
+#              ;;
+#          --)              # End of all options.
+#             shift
+#             break
+#              ;;
+#          -?*)
+#             printf 'WARN: Unknown option (ignored): %s\n' "$1" >&2
+#              ;;
+#          *)               # Default case: No more options, so break out of the loop.
+#             break
+#     esac7
+
+#     shift
+#  done
+
+# if $DO_WP_INSTALL; then
+#     wp_download_create_install
+# fi
