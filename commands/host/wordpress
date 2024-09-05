@@ -83,56 +83,58 @@ download_install_wp() {
     #     echo "WordPress is probably already installed. That's why I'd rather quit now."
     #     exit 1
     # fi
-    # while true; do
-    #     echo "
-    # Please enter site details. Press Ctrl+C at any time to cancel this command completely.
-    #     "
-    #     prompt_for_input "Site Title" WP_TITLE
-    #     prompt_for_input "Site Production URL" WP_URL
-    #     prompt_for_input "Admin User" WP_ADMIN_USER
-    #     prompt_for_input "Admin Password" WP_ADMIN_PASSWORD
-    #     prompt_for_input "Admin Email" WP_ADMIN_EMAIL
 
-    #     echo "
-    # You have entered the following details:
-    # "
-    #     echo "Site Title: $WP_TITLE"
-    #     echo "Site Production URL: $WP_URL"
-    #     echo "Admin User: $WP_ADMIN_USER"
-    #     echo "Admin Password: $WP_ADMIN_PASSWORD"
-    #     echo "Admin Email: $WP_ADMIN_EMAIL"
-    #     read -p "
-    # Are these details correct? (Y/n): " confirmation
+    WP_TITLE="ddevtest1"
+    WPURL="ddevtest1.com"
+    WP_ADMIN_USER="admin"
+    WP_ADMIN_PASSWORD="1357531"
+    WP_ADMIN_EMAIL="asdf@asdf.com"
 
-    #     if [ -z "$confirmation" ]; then
-    #         confirmation="yes"
-    #     fi
+    while true; do
+        echo "
+    Please enter site details. Press Ctrl+C at any time to cancel this command completely.
+        "
+        #prompt_for_input "Site Title" WP_TITLE
+        #prompt_for_input "Site Production URL" WPURL
+        #prompt_for_input "Admin User" WP_ADMIN_USER
+        #prompt_for_input "Admin Password" WP_ADMIN_PASSWORD
+        #prompt_for_input "Admin Email" WP_ADMIN_EMAIL
 
-    #     case ${confirmation,,} in
-    #     y | yes) break ;;
-    #     n | no) echo "
-    # Let's try again." ;;
-    #     *) echo "Please answer yes or no." ;;
-    #     esac
-    # done
+        echo "
+    You have entered the following details:
+    "
+        echo "Site Title: $WP_TITLE"
+        echo "Site Production URL: $WPURL"
+        echo "Admin User: $WP_ADMIN_USER"
+        echo "Admin Password: $WP_ADMIN_PASSWORD"
+        echo "Admin Email: $WP_ADMIN_EMAIL"
+        #     read -p "
+        # Are these details correct? (Y/n): " confirmation
+
+        #     if [ -z "$confirmation" ]; then
+        #         confirmation="yes"
+        #     fi
+
+        #     case ${confirmation,,} in
+        #     y | yes) break ;;
+        #     n | no) echo "
+        # Let's try again." ;;
+        #     *) echo "Please answer yes or no." ;;
+        #     esac
+        break
+    done
 
     # if [ -f "/var/www/html/wp-config.php" ]; then
     #     echo "WordPress is probably already installed. That's why I'd rather quit now."
     #     exit 1
     # else
 
-    WP_TITLE="wp5"
-    WP_URL="wp5.com"
-    WP_ADMIN_USER="admin"
-    WP_ADMIN_PASSWORD="1357531"
-    WP_ADMIN_EMAIL="asdf@asdf.com"
-
     echo "Download, Create and Install a fresh new WordPress..."
 
     # TODO: remove this later
     #ddev delete -O -y
 
-    ddev config --project-type=wordpress --web-environment-add="WP_ENVIRONMENT_TYPE=development,WPURL=$WP_URL" --disable-settings-management=true --php-version=8.1
+    ddev config --project-type=wordpress --web-environment-add="WP_ENVIRONMENT_TYPE=development,WPURL=$WPURL" --disable-settings-management=true --php-version=8.1
 
     # set WP_ENVIRONMENT_TYPE env variable just for this initial install, since it hasn't yet been set in config.yaml. This will allow the wp core install to use wp-config-development.php
     # export WP_ENVIRONMENT_TYPE=development
@@ -145,7 +147,7 @@ download_install_wp() {
 
     # Add the WPURL entry, set to the value provided as the production URL that is stored in the DB. This will be used by Traefik Middleware to rewrite URLs in the HTML response to be relative paths, such that any URL can be used to access the site while maintaining URL in DB as production - keeps the database consistent and clean, without any search/replace mess
     # yq e 'del(.web_environment[] | select(test("WPURL"))) ' -i .ddev/config.yaml
-    # yq e ".web_environment += [\"WPURL=$WP_URL\"]" -i .ddev/config.yaml
+    # yq e ".web_environment += [\"WPURL=$WPURL\"]" -i .ddev/config.yaml
 
     # yq e ".disable_settings_management = false" -i .ddev/config.yaml
 
@@ -162,13 +164,16 @@ download_install_wp() {
     mkdir -p ./.ddev/traefik && cp -f ~/.ddev/wordpress/dynamic_config.middlewares.yaml ./.ddev/traefik/dynamic_config.middlewares.yaml
 
     # change placeholder values in wp-config.php
-    ddev start
-
     update_wp_config
+
+    # replace template placeholders in traefik dynamic config
+    update_traefik_config
+
+    ddev start
 
     ## download and install wordpress
     ddev exec wp core download
-    ddev exec wp core install --url=$WP_URL --title=$WP_TITLE --admin_user=$WP_ADMIN_USER --admin_password=$WP_ADMIN_PASSWORD --admin_email=$WP_ADMIN_EMAIL --skip-email
+    ddev exec wp core install --url=$WPURL --title=$WP_TITLE --admin_user=$WP_ADMIN_USER --admin_password=$WP_ADMIN_PASSWORD --admin_email=$WP_ADMIN_EMAIL --skip-email
 
     ## empties a site of its content (posts, comments, terms, and meta)
     ddev exec wp site empty --uploads --yes
@@ -194,11 +199,12 @@ download_install_wp() {
         ddev exec wp package install $WP_DDEV_CLI_PACKAGES
     fi
 
-    echo "************************************************************
+    # this is no longer necessary, as we are setting the traefik config stuff manually up front, rather than with Go templates
+    #     echo "************************************************************
 
-You MUST restart DDEV now - use the \`ddev restart\` command
+    # You MUST restart DDEV now - use the \`ddev restart\` command
 
-************************************************************"
+    # ************************************************************"
 }
 
 update_wp_config() {
@@ -228,7 +234,33 @@ update_wp_config() {
     sed_replace "$file1" "${args[@]}"
     sed_replace "$file2" "${args[@]}"
 
-    echo "Replacements done."
+    echo "wp-config.php updated."
+}
+
+update_traefik_config() {
+    # TODO: probably should do something that copies and overwrites template from global directory to the current project directory, so that it can update the WPURL value if it was changed after being initially set
+
+    local WPURL
+    WPURL=$(yq e '.web_environment[] | select(. == "WPURL=*")' .ddev/config.yaml | sed 's/WPURL=//')
+
+    # Declare an associative array
+    declare -A replacements=(
+        ["{{ \.App.Name }}"]=$(basename $(pwd))
+        ["{{ WPURL }}"]=$WPURL
+    )
+
+    file1="./.ddev/traefik/dynamic_config.middlewares.yaml"
+
+    # Convert associative array to positional parameters
+    args=()
+    for key in "${!replacements[@]}"; do
+        args+=("$key" "${replacements[$key]}")
+    done
+
+    # Perform replacements
+    sed_replace "$file1" "${args[@]}"
+
+    echo "Traefik config updated."
 }
 
 sed_replace() {
@@ -291,12 +323,14 @@ main() {
     wpconfig)
         update_wp_config
         ;;
+    traefik)
+        update_traefik_config
+        ;;
     *)
         show_help
         exit 1
         ;;
     esac
-
 }
 
 main "$@"

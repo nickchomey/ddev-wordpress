@@ -46,7 +46,7 @@ post_install_actions:
   - ddev delete -O -y
   #- ddev restart -y
   - rm -f ~/.ddev/commands/host/wordpress
-  - ln -s ~/tool-dev/ddev-wp/commands/host/wordpress ~/.ddev/commands/host
+  - ln -s ~/tool-dev/ddev-wordpress/commands/host/wordpress ~/.ddev/commands/host
 
 # Shell actions that can be done during removal of the add-on
 removal_actions:
