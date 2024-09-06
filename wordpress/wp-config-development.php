@@ -18,11 +18,3 @@ define('DB_PASSWORD', 'db');
 
 /** MySQL hostname */
 define('DB_HOST', 'db');
-
-define('DB_CHARSET', 'utf8mb4');
-define('DB_COLLATE', '');
-
-/** Enable debug */
-define('WP_DEBUG', true);
-define('WP_DEBUG_LOG', true);
-define('WP_DEBUG_DISPLAY', false);
