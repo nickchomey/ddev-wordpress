@@ -5,12 +5,18 @@ http:
         - {{ .App.Name }}-redirectHttps
         - {{ .App.Name }}-relative-location-header
         - {{ .App.Name }}-relative-body-urls
+        - {{ .App.Name }}-change-request-headers
     {{ .App.Name }}-web-80-https:
       middlewares:
         - {{ .App.Name }}-relative-location-header
         - {{ .App.Name }}-relative-body-urls
+        - {{ .App.Name }}-change-request-headers
       
   middlewares:
+    {{ .App.Name }}-change-request-headers:
+      headers:
+        customRequestHeaders:
+          Host: "{{ WPURL }}"
     {{ .App.Name }}-redirectHttps:
       redirectScheme:
         scheme: https
