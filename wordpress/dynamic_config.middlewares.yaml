@@ -17,6 +17,7 @@ http:
       headers:
         customRequestHeaders:
           Host: "{{ WPURL }}"
+          X-Forwarded-Host: "{{ WPURL }}"
     {{ .App.Name }}-redirectHttps:
       redirectScheme:
         scheme: https
@@ -26,6 +27,8 @@ http:
         rewrite-response-headers:
           rewrites:
             - header: Location
+              regex: (https?)?(%3A|:)?(%2F|\/|\\/|\\%2F)(%2F|\/|\\/|\\%2F){{ WPURL }}(%2F|\/|\\\/|\\%2F)?(.*?)?
+            - header: Link
               regex: (https?)?(%3A|:)?(%2F|\/|\\/|\\%2F)(%2F|\/|\\/|\\%2F){{ WPURL }}(%2F|\/|\\\/|\\%2F)?(.*?)?
               # {RequestHost} token is available to be used in the replacement. e.g. replacement: https://{RequestHost}/$2
               replacement: $4$6 #uses $4$6 so as to add a slash if there's nothing in the path. $3$4 are separated so as to allow for the single slash. The various permutations of / came up through trial and error across different pages and resource requests.
