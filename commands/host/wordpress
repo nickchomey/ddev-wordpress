@@ -112,9 +112,7 @@ create_ddev_project() {
 
 update_wp_config() {
     
-    # check if there is a wp-config.php file in the project directory. If not, check if there's wp-config-sample.php and copy it to wp-config.php
-    echo "Present working directory: $(pwd)"
-    
+    # check if there is a wp-config.php file in the project directory. If not, check if there's wp-config-sample.php and copy it to wp-config.php    
     # Find all wp-config.php files and echo their names
     wp_config_files=$(find . -maxdepth 1 -type f -name "wp-config*.php")
     for file in $wp_config_files; do
@@ -187,7 +185,10 @@ EOF
         
         
         # add defined()|| to the beginning of each define() statement in wp-config.php so that the constants are not redefined if they already exist in other environment config files
-        sed -i "s/define( *'\([^']*\)', *\([^)]*\) *);/defined('\1') || define('\1', \2);/g" wp-config.php
+        #sed -i "s/define(*'\([^']*\)', *\([^)]*\)*);/defined('\1') || define('\1', \2);/g" wp-config.php
+        
+        sed -i -E "/^define\(*'DB_(NAME|USER|PASSWORD|HOST)'/ s/define\(*'([^']*)', *([^)]*)*\);/defined('\1') || define('\1', \2);/" wp-config.php
+        
         
         # delete any line that contains 'put your unique phrase here'
         sed -i '/put your unique phrase here/d' wp-config.php
@@ -380,12 +381,20 @@ You MUST restart DDEV now - use the \`ddev restart\` command
 
 
 import_wp() {
-    # Create ddev project
+    # get the production URL from the user
+    prompt_for_input "Site Production URL" WPURL
     
+    # Create ddev project with the provided production URL
+    create_ddev_project "$WPURL"
     
+    # start the project so that wp-cli can be used to set things up
+    ddev start
     
+    # Update wp-config.php with the WP_ENVIRONMENT_TYPE check and selection mechanism, insert wp-config-development.php, and update the salts
     update_wp_config
     
+    # replace template placeholders in traefik dynamic config
+    update_traefik_config
     
     # Find SQL files and save to a variable
     sql_files=$(find . -maxdepth 1 -type f -name "*.sql*")
