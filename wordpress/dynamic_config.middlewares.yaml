@@ -3,12 +3,12 @@ http:
     {{ .App.Name }}-web-80-http:
       middlewares:
         - {{ .App.Name }}-redirectHttps
-        - {{ .App.Name }}-relative-location-header
+        - {{ .App.Name }}-relative-response-headers
         - {{ .App.Name }}-relative-body-urls
         - {{ .App.Name }}-change-request-headers
     {{ .App.Name }}-web-80-https:
       middlewares:
-        - {{ .App.Name }}-relative-location-header
+        - {{ .App.Name }}-relative-response-headers
         - {{ .App.Name }}-relative-body-urls
         - {{ .App.Name }}-change-request-headers
       
@@ -22,16 +22,17 @@ http:
       redirectScheme:
         scheme: https
         permanent: true
-    {{ .App.Name }}-relative-location-header:
+    {{ .App.Name }}-relative-response-headers:
       plugin:
         rewrite-response-headers:
           rewrites:
             - header: Location
               regex: (https?)?(%3A|:)?(%2F|\/|\\/|\\%2F)(%2F|\/|\\/|\\%2F){{ WPURL }}(%2F|\/|\\\/|\\%2F)?(.*?)?
-            - header: Link
-              regex: (https?)?(%3A|:)?(%2F|\/|\\/|\\%2F)(%2F|\/|\\/|\\%2F){{ WPURL }}(%2F|\/|\\\/|\\%2F)?(.*?)?
               # {RequestHost} token is available to be used in the replacement. e.g. replacement: https://{RequestHost}/$2
               replacement: $4$6 #uses $4$6 so as to add a slash if there's nothing in the path. $3$4 are separated so as to allow for the single slash. The various permutations of / came up through trial and error across different pages and resource requests.
+            - header: Link
+              regex: (https?)?(%3A|:)?(%2F|\/|\\/|\\%2F)(%2F|\/|\\/|\\%2F){{ WPURL }}(%2F|\/|\\\/|\\%2F)?(.*?)?
+              replacement: $4$6
     {{ .App.Name }}-relative-body-urls:
       plugin:
         rewrite-response-body:
