@@ -1,6 +1,6 @@
 # Details about the install.yaml file are at https://ddev.readthedocs.io/en/latest/users/extend/additional-services/#sections-and-features-of-ddev-get-add-on-installyaml
 
-name: addon-template
+name: ddev-wordpress
 
 # pre_install_actions - list of actions to run before installing the addon.
 # Examples would be removing an extraneous docker volume,
@@ -34,7 +34,7 @@ global_files:
   #- commands/host/wordpress
   - traefik/static_config.rewrite_urls.yaml
   - wordpress/dynamic_config.middlewares.yaml
-  - wordpress/wp-config.php
+  #- wordpress/wp-config.php
   - wordpress/wp-config-development.php
 
 # List of add-on names that this add-on depends on
@@ -43,7 +43,7 @@ dependencies:
 
 # DDEV environment variables can be interpolated into these actions
 post_install_actions:
-  - ddev delete -O -y
+  #- ddev delete -O -y
   #- ddev restart -y
   - rm -f ~/.ddev/commands/host/wordpress
   - ln -s ~/tool-dev/ddev-wordpress/commands/host/wordpress ~/.ddev/commands/host

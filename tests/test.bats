@@ -1,9 +1,9 @@
 setup() {
   set -eu -o pipefail
-  export DIR="$( cd "$( dirname "$BATS_TEST_FILENAME" )" >/dev/null 2>&1 && pwd )/.."
-  export TESTDIR=~/tmp/test-addon-template
+  export DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")" >/dev/null 2>&1 && pwd)/.."
+  export TESTDIR=~/tmp/test-ddev-wordpress
   mkdir -p $TESTDIR
-  export PROJNAME=test-addon-template
+  export PROJNAME=test-ddev-wordpress
   export DDEV_NON_INTERACTIVE=true
   ddev delete -Oy ${PROJNAME} >/dev/null 2>&1 || true
   cd "${TESTDIR}"
@@ -19,7 +19,7 @@ health_checks() {
 
 teardown() {
   set -eu -o pipefail
-  cd ${TESTDIR} || ( printf "unable to cd to ${TESTDIR}\n" && exit 1 )
+  cd ${TESTDIR} || (printf "unable to cd to ${TESTDIR}\n" && exit 1)
   ddev delete -Oy ${PROJNAME} >/dev/null 2>&1
   [ "${TESTDIR}" != "" ] && rm -rf ${TESTDIR}
 }
@@ -35,10 +35,9 @@ teardown() {
 
 @test "install from release" {
   set -eu -o pipefail
-  cd ${TESTDIR} || ( printf "unable to cd to ${TESTDIR}\n" && exit 1 )
-  echo "# ddev get ddev/ddev-addon-template with project ${PROJNAME} in ${TESTDIR} ($(pwd))" >&3
-  ddev get ddev/ddev-addon-template
+  cd ${TESTDIR} || (printf "unable to cd to ${TESTDIR}\n" && exit 1)
+  echo "# ddev get ddev/ddev-ddev-wordpress with project ${PROJNAME} in ${TESTDIR} ($(pwd))" >&3
+  ddev get ddev/ddev-ddev-wordpress
   ddev restart >/dev/null
   health_checks
 }
-

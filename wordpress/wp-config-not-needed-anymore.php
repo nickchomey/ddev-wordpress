@@ -1,5 +1,6 @@
 <?php
-{{ $config := . }}/**
+
+/**
  * The base configuration for WordPress
  *
  * The wp-config.php creation script uses this file during the installation.
@@ -33,18 +34,18 @@ If you would like to set other environment configs, you can set WP_ENVIRONMENT_T
 
 $env_type = getenv('WP_ENVIRONMENT_TYPE') ?: 'production';
 
-if ($env_type != "production" ) {
+if ($env_type != "production") {
     $ddev_settings = dirname(__FILE__) . "/wp-config-$env_type.php";
-    if (is_readable($ddev_settings)){
+    if (is_readable($ddev_settings)) {
         require_once($ddev_settings);
     } else {
         //TODO: this is probably not going to actually log anything, because logging gets set up later.
         error_log("No $ddev_settings file found. Using defaults. If the site is not working, look at wp-config.php and create a wp-config-$env_type.php file, and set the WP_ENVIRONMENT_TYPE.");
-        
+
         // exit the request until the environment_type and config files are set up appropriately
-        
+
         http_response_code(500);
-        echo("No $ddev_settings file found. Using defaults. If the site is not working, look at wp-config.php and create a wp-config-$env_type.php file, and set the WP_ENVIRONMENT_TYPE.");
+        echo ("No $ddev_settings file found. Using defaults. If the site is not working, look at wp-config.php and create a wp-config-$env_type.php file, and set the WP_ENVIRONMENT_TYPE.");
         exit();
     }
 }
@@ -82,14 +83,14 @@ defined('DB_COLLATE') || define('DB_COLLATE', '{{ $config.DbCollate }}');
  *
  * @since 2.6.0
  */
-define( 'AUTH_KEY', '{{ $config.AuthKey }}' );
-define( 'SECURE_AUTH_KEY', '{{ $config.SecureAuthKey }}' );
-define( 'LOGGED_IN_KEY', '{{ $config.LoggedInKey }}' );
-define( 'NONCE_KEY', '{{ $config.NonceKey }}' );
-define( 'AUTH_SALT', '{{ $config.AuthSalt }}' );
-define( 'SECURE_AUTH_SALT', '{{ $config.SecureAuthSalt }}' );
-define( 'LOGGED_IN_SALT', '{{ $config.LoggedInSalt }}' );
-define( 'NONCE_SALT', '{{ $config.NonceSalt }}' );
+define('AUTH_KEY', '{{ $config.AuthKey }}');
+define('SECURE_AUTH_KEY', '{{ $config.SecureAuthKey }}');
+define('LOGGED_IN_KEY', '{{ $config.LoggedInKey }}');
+define('NONCE_KEY', '{{ $config.NonceKey }}');
+define('AUTH_SALT', '{{ $config.AuthSalt }}');
+define('SECURE_AUTH_SALT', '{{ $config.SecureAuthSalt }}');
+define('LOGGED_IN_SALT', '{{ $config.LoggedInSalt }}');
+define('NONCE_SALT', '{{ $config.NonceSalt }}');
 
 /**#@-*/
 
@@ -128,11 +129,9 @@ defined('WP_DEBUG_DISPLAY') || define('WP_DEBUG_DISPLAY', false);
 /* That's all, stop editing! Happy publishing. */
 
 /** Absolute path to the WordPress directory. */
-if (!defined('ABSPATH')) {
-    define('ABSPATH', __DIR__ . '{{ $config.AbsPath }}');
+if (! defined('ABSPATH')) {
+    define('ABSPATH', __DIR__ . '/');
 }
 
 /** Sets up WordPress vars and included files. */
-if ( file_exists( ABSPATH . '/wp-settings.php' ) ) {
-	require_once ABSPATH . '/wp-settings.php';
-}
+require_once ABSPATH . 'wp-settings.php';
