@@ -122,6 +122,7 @@ update_wp_config() {
     
     if [ ! -f "wp-config.php" ]; then
         if [ -f "wp-config-sample.php" ]; then
+            # TODO: perhaps change this to use `wp config create`
             mv wp-config-sample.php wp-config.php
         else
             echo "No wp-config.php or wp-config-sample.php found in the project directory. Exiting."
@@ -130,9 +131,16 @@ update_wp_config() {
     fi
     
     if [ -f "wp-config.php" ]; then
-        # insert the WP_ENVIRONMENT_TYPE check and selection mechanism into the top of wp-config.php
-        # this will allow for the existing or default/stock-installed wp-config.php to be used, but for ddev-specific constants to override where necessary
-        code_to_insert=$(cat <<'EOF'
+    
+    
+        # check if the WP_ENVIRONMENT_TYPE check and selection mechanism is already in the wp-config.php file
+        # if it is, then don't add it again
+        # look for "Dynamic site configuration depending on the environment type" in the file
+        if ! grep -q "Dynamic site configuration depending on the environment type" wp-config.php; then
+        
+            # insert the WP_ENVIRONMENT_TYPE check and selection mechanism into the top of wp-config.php
+            # this will allow for the existing or default/stock-installed wp-config.php to be used, but for ddev-specific constants to override where necessary
+            code_to_insert=$(cat <<'EOF'
 
 // wp-config-ddev.php not needed
 
@@ -165,38 +173,32 @@ if ($env_type != "production" ) {
     }
 }
 EOF
-        )
+            )
 
-        # Insert the code into wp-config.php
-        # sed -i "/<?php/a $code_to_insert" wp-config.php
-        
-        # Create a temporary file with the code to be inserted
-        temp_file=$(mktemp)
-        echo "$code_to_insert" > "$temp_file"
+            
+            # Create a temporary file with the code to be inserted
+            temp_file=$(mktemp)
+            echo "$code_to_insert" > "$temp_file"
 
-        # Insert the code into wp-config.php after the opening <?php tag
-        sed -i "/<?php/r $temp_file" wp-config.php
+            # Insert the code into wp-config.php after the opening <?php tag
+            sed -i "/<?php/r $temp_file" wp-config.php
 
-        # Clean up the temporary file
-        rm "$temp_file"
+            # Clean up the temporary file
+            rm "$temp_file"
 
-        # Find all define() statements in wp-config.php and replace them with defined('CONSTANT_NAME') || define('CONSTANT_NAME', 'value'). If there are any comments on the line after the define() statement, they will be preserved
+            # add defined()|| to the beginning of each define() statement in wp-config.php so that the constants are not redefined if they already exist in other environment config files
+            #sed -i "s/define(*'\([^']*\)', *\([^)]*\)*);/defined('\1') || define('\1', \2);/g" wp-config.php
+            
+            sed -i -E "/^define\(*'DB_(NAME|USER|PASSWORD|HOST)'/ s/define\(*'([^']*)', *([^)]*)*\);/defined('\1') || define('\1', \2);/" wp-config.php
+            
+            # not needed now that only targeting specific constants
+            # delete any line that contains 'put your unique phrase here'
+            #sed -i '/put your unique phrase here/d' wp-config.php
+          
+        fi
         
-        
-        
-        # add defined()|| to the beginning of each define() statement in wp-config.php so that the constants are not redefined if they already exist in other environment config files
-        #sed -i "s/define(*'\([^']*\)', *\([^)]*\)*);/defined('\1') || define('\1', \2);/g" wp-config.php
-        
-        sed -i -E "/^define\(*'DB_(NAME|USER|PASSWORD|HOST)'/ s/define\(*'([^']*)', *([^)]*)*\);/defined('\1') || define('\1', \2);/" wp-config.php
-        
-        
-        # delete any line that contains 'put your unique phrase here'
-        sed -i '/put your unique phrase here/d' wp-config.php
-        
-        # Generate new salts. Better done after sed because sometimes the salts contain characters that mess with the sed command
+        # Generate new salts
         ddev exec wp config shuffle-salts
-        
-       
     fi
     
     # # TODO: Need to extract this so that the values are passed in as arguments
@@ -293,26 +295,21 @@ download_install_wp() {
         echo "DEBUG is set, using default values for site details."
     else
         while true; do
-            echo "
-        Please enter site details. Press Ctrl+C at any time to cancel this command completely.
-            "
+            echo $'\nPlease enter site details. Press Ctrl+C at any time to cancel this command completely.\n'
             prompt_for_input "Site Title" WP_TITLE
             prompt_for_input "Site Production URL" WPURL
             prompt_for_input "Admin User" WP_ADMIN_USER
             prompt_for_input "Admin Password" WP_ADMIN_PASSWORD
             prompt_for_input "Admin Email" WP_ADMIN_EMAIL
 
-            echo "
-        You have entered the following details:
-        "
+            echo $'\nYou have entered the following details:\n'
             echo "Site Title: $WP_TITLE"
             echo "Site Production URL: $WPURL"
             echo "Admin User: $WP_ADMIN_USER"
             echo "Admin Password: $WP_ADMIN_PASSWORD"
             echo "Admin Email: $WP_ADMIN_EMAIL"
             
-            read -r -p "
-        Are these details correct? (Y/n): " confirmation
+            read -r -p $'\nAre these details correct? (Y/n): ' confirmation
 
             if [ -z "$confirmation" ]; then
                 confirmation="yes"
@@ -320,8 +317,7 @@ download_install_wp() {
 
             case ${confirmation,,} in
             y | yes) break ;;
-            n | no) echo "
-        Let's try again." ;;
+            n | no) echo -e "\nLet's try again."  ;;
             *) echo "Please answer yes or no." ;;
             esac
         done
@@ -371,16 +367,49 @@ download_install_wp() {
         ddev exec wp package install "$WP_DDEV_CLI_PACKAGES"
     fi
 
-    # this is no longer necessary, as we are setting the traefik config stuff manually up front, rather than with Go templates
+    
     echo "************************************************************
 
-You MUST restart DDEV now - use the \`ddev restart\` command
+Restarting DDEV Project now to complete the process
 
 ************************************************************"
+
+    ddev restart
 }
 
 
 import_wp() {
+    
+    # First check if any SQL files are in the current directory. If not, bail.
+    
+    sql_files=$(find . -maxdepth 1 -type f -name "*.sql*")
+    if [ -z "$sql_files" ]; then
+        echo "No SQL files found in the current directory. Please place your database backup file in the wordpress root directory and try again."
+        exit 0
+    fi
+    
+    # if there's a ddev project directory, prompt them to either delete it or stop the process and decide what to do
+    if [ -d ".ddev" ]; then
+        while true; do
+            read -r -p $'\n A .ddev directory already exists in this directory. Do you want to delete it and start a fresh project here? (Y/n): ' delete_ddev
+            if [ -z "$delete_ddev" ]; then
+                delete_ddev="yes"
+            fi
+
+            case ${delete_ddev,,} in
+            y | yes)
+                rm -rf .ddev/
+                break
+                ;;
+            n | no)
+                echo $'\nPlease delete the .ddev directory and try again.'
+                exit 0
+                ;;
+            *) echo -e $'\nPlease answer yes or no.' ;;
+            esac
+        done
+    fi
+    
     # get the production URL from the user
     prompt_for_input "Site Production URL" WPURL
     
@@ -396,24 +425,20 @@ import_wp() {
     # replace template placeholders in traefik dynamic config
     update_traefik_config
     
-    # Find SQL files and save to a variable
-    sql_files=$(find . -maxdepth 1 -type f -name "*.sql*")
+    ddev import-db --file="$sql_files"
+    echo "SQL files imported to DDEV Project"
+    
+    echo "************************************************************
 
-    # Check if any SQL files were found
-    if [ -n "$sql_files" ]; then
-        echo "Found SQL files:"
-        echo "$sql_files"
-        # You can now use $sql_files in your import logic
-        # For example, you might want to use the first file found:
-        # first_sql_file=$(echo "$sql_files" | head -n 1)
-        # ddev import-db --file="$first_sql_file"
-        ddev import-db --file="$sql_files"
-    else
-        echo "No SQL files found in the current directory."
-        # Fallback to the original import logic
-    fi
+Restarting DDEV Project now to complete the import process
+
+************************************************************"
+
+    ddev restart
     
 }
+
+
 DEBUG=false
 main() {
     
@@ -428,7 +453,7 @@ main() {
             show_help
             exit 0
             ;;
-        install|import|wpconfig|traefik)
+        install|import|wpconfig|traefik|restart)
             command="$1"
             shift
             ;;

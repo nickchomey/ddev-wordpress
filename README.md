@@ -1,22 +1,60 @@
-[![tests](https://github.com/ddev/ddev-ddev-wordpress/actions/workflows/tests.yml/badge.svg)](https://github.com/ddev/ddev-ddev-wordpress/actions/workflows/tests.yml) ![project is maintained](https://img.shields.io/maintenance/yes/2024.svg)
 
-# ddev-ddev-wordpress <!-- omit in toc -->
+## DDEV-Wordpress
+This ddev add-on both simplifies getting started with a WordPress project in DDEV, as well as adds some crucial functionality that addresses fundamental shortcomings with WordPress in a development environment.
 
-* [What is ddev-ddev-wordpress?](#what-is-ddev-ddev-wordpress)
-* [Components of the repository](#components-of-the-repository)
-* [Getting started](#getting-started)
-* [How to debug in Github Actions](#how-to-debug-tests-github-actions)
+## Challenges of running WordPress in DDEV
+### Different Database credentials
+WordPress sets its database credentials in the wp-config.php file, rather than through any sort of environment variables. So, when we copy a wordpress installation from production to development, we need to change these credentials
 
-## What is ddev-ddev-wordpress?
+An eventual goal (see issue #1) will be to load everything through environment variables and .env files, but for now we simply prepend the database constant definitions with `defined('CONSTANT') ||` so that the credentials can be pre-emptively loaded from a new `wp-config-development.php` file. This is used, rather than the existing `wp-config-ddev.php` file because 1) `development` is one of the natively supported wordpress [environment types](https://make.wordpress.org/core/2020/08/27/wordpress-environment-types/). Also, it is just generally best to distance ourselves from DDEV's default WordPress configurations.
 
-This repository is a template for providing [DDEV](https://ddev.readthedocs.io) add-ons and services.
+### Absolute URL usage
+Wordpress does not have any support for using relative paths. Instead, everything is done with absolute urls - be it internal a href links to other pages, or the urls for loading static assets.
 
-In DDEV addons can be installed from the command line using the `ddev get` command, for example, `ddev get ddev/ddev-redis` or `ddev get ddev/ddev-solr`.
+Moreover, it hardcodes the site url in the wp_options table in the database, which can also be configured in wp-config.php.
 
-This repository is a quick way to get started. You can create a new repo from this one by clicking the template button in the top right corner of the page.
+There have been various attempts over the decades to implement relative paths.
+1. Using a slew of ever-changing and always-insufficient wordpress hooks (e.g. [This plugin](https://wordpress.org/plugins/root-relative-urls/))
+2. Wrapping the request early-on with php output buffers and rewriting the URLs. (e.g. https://stackoverflow.com/questions/17187437/relative-urls-in-wordpress#comment88928219_18516783)
 
-![template button](images/template-button.png)
+But these have always been insufficient - they dont handle all headers, maybe dont work early or late enough in the request, dont handle redirects perfectly, etc...
 
+Pushes for changes in WP Core (https://core.trac.wordpress.org/ticket/17048) have been resoudingly rejected. [Wordpress will always only ever work with absolute URLs](https://make.wordpress.org/core/handbook/contribute/design-decisions/#absolute-versus-relative-urls).
+
+As is always prudent with WP, dont swim against the tide! Instead, the only options for doing any local development on a Wordpress site have been to:
+1. Set your hosts file so that requests to the production domain are fulfilled locally. This prevents access to the production site, and also inevitably causes errors when you are turning hosts on and off. DNS caching also gets in the way.
+2. Set a new hostname/fully-qualified DNS (which DDEV makes easy) and do a global search/replace in the database to change the production URL to something like `project.ddev.site`. This is also a hassle. It also prevents you from using DDEV's native capacity for routing *multiple* hostnames and fully-qualified DNS to the same project.
+
+This add-on finally solves this problem *completely*, by leveraging the dynamic middleware capabilities of DDEV's Traefik-powered router. It does this by accepting WordPress as it is, and using Traefik's middlewares capabilities to converts any instance of the production URL to a relative path. It does this for Request Headers, Response Headers and the entire contents of the Response Body. This allows you to set as many hostnames/fqdns within DDEV as you like.
+
+Because Traefik operates both before and after PHP, there's no possibility of it "missing" anything. In fact, WordPress doesn't have any knowledge, whatsoever, that it isn't actually being accessed from something other than the production URL in the database!
+
+## Commands
+* `ddev wordpress install`
+    - Creates a new DDEV project containing a fresh WordPress installation. The project and its URL will be named after the current working directory (test/ -> test.ddev.site), but you can set the production URL that is stored in the database to be something different
+    - Updates `wp-config.php` to read from a new `wp-config-development.php`
+    - Creates the traefik dynamic config for rewriting absolute urls to relative paths
+    - Sets required environment variables in the project's `config.yaml` file
+* `ddev wordpress import`
+    * Does the same as `install`, except for it imports an existing wordpress site that you have placed in the current directory
+    * The current directory must contain a sql dump of the site's database (named *.sql.*).
+* `ddev wordpress wpconfig` - Only runs the `wp-config.php` compatibility mechanism used above
+* `ddev wordpress traefik` - Creates a traefik middleware extension config, which allows for converting WordPress' absolute urls to relative paths.
+
+## Testing it out
+1. Open an existing DDEV Project and install this add-on with `ddev addon get nickchomey/ddev-wordpress`. It will be installed *globally* rather than in the project. This only needs to be done once.
+2. Create a new directory in which you want to create a new DDEV WordPress project. Enter the directory.
+3. run `ddev wordpress install` - you will be prompted for some details. Use whatever you like for all of it, but try using a different URL from the ddev project name/directory name. (e.g. if the directory is named `test`, the url will be `test.ddev.site`. But you can set the production URL to `ddev.isamazing.com`)
+4. It will do everything automatically and restart the ddev container, after which you can open the browser to `test.ddev.site` and it will be browsing and behaving as if you are accessing `ddev.isamazing.com`.
+5. Try uploading some media or creating links between internal pages.
+6. Create new hostnames/fqdns in the ddev project's `config.yaml` file. Restart DDEV.
+7. Access the site with any of these URLs. Notice that the media and links point to `/wp-content/uploads/2024/09/media.jpg` rather than `ddev.isamazing.com/wp-content/uploads/2024/09/media.jpg`
+
+## Troubleshooting
+It is most likely that you would get errors related to the `wp-config.php` and `wp-config-development.php` mechanism. Inspect those files for errors. Also, if you use something like Bedrock, it may not work at all. Please feel free to report any issues here. 
+
+
+# Reference Notes from the Add-on Template for outstanding tasks
 ## Components of the repository
 
 * The fundamental contents of the add-on service or other component. For example, in this template there is a [docker-compose.ddev-wordpress.yaml](docker-compose.ddev-wordpress.yaml) file.
