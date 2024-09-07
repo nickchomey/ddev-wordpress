@@ -239,7 +239,7 @@ update_traefik_config() {
 
     # Declare an associative array
     declare -A replacements=(
-        ["{{ \.App.Name }}"]=$(basename $(pwd))
+        ["{{ \.App.Name }}"]=$(basename "$(pwd)")
         ["{{ WPURL }}"]=$WPURL
     )
 
