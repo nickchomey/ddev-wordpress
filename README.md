@@ -56,6 +56,8 @@ It is most likely that you would get errors related to the `wp-config.php` and `
 
 You can also check that the `WPURL` environment variable is correctly set in `.ddev/config.yaml` to the database's production URL. This is necessary for the relative paths to work.
 
+If you get any sort of infinite redirect loop (particularly a 301 code), it could mean that the URL rewriting rules are not working quite as comprehensively as needed. Please open an issue with details and we'll get it solved.
+
 
 # Reference Notes from the Add-on Template for outstanding tasks
 ## Components of the repository
