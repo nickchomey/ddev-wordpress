@@ -49,9 +49,10 @@ Because Traefik operates both before and after PHP, there's no possibility of it
 5. Try uploading some media or creating links between internal pages.
 6. Create new hostnames/fqdns in the ddev project's `config.yaml` file. Restart DDEV.
 7. Access the site with any of these URLs. Notice that the media and links point to `/wp-content/uploads/2024/09/media.jpg` rather than `ddev.isamazing.com/wp-content/uploads/2024/09/media.jpg`
+8. If you eventually deploy the site to production, you can simply point your `ddev.isamazing.com` DNS record to the server and it will work.
 
 ## Troubleshooting
-It is most likely that you would get errors related to the `wp-config.php` and `wp-config-development.php` mechanism. Inspect those files for errors. Also, if you use something like Bedrock, it may not work at all. Please feel free to report any issues here. 
+It is most likely that you would get errors related to the `wp-config.php` and `wp-config-development.php` mechanism. Inspect those files for errors. Also, if you use something like Bedrock, it may not work at all. Please feel free to report any issues here.
 
 
 # Reference Notes from the Add-on Template for outstanding tasks
