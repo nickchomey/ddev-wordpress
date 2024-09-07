@@ -1,6 +1,6 @@
 
 ## DDEV-Wordpress
-This ddev add-on both simplifies getting started with a WordPress project in DDEV, as well as adds some crucial functionality that addresses fundamental shortcomings with WordPress in a development environment.
+This ddev add-on both simplifies getting started with a WordPress project in DDEV, as well as adds some crucial functionality that addresses fundamental shortcomings with WordPress in a development environment - namely with regards to accessing it via a non-production URL.
 
 ## Challenges of running WordPress in DDEV
 ### Different Database credentials
@@ -17,11 +17,11 @@ There have been various attempts over the decades to implement relative paths.
 1. Using a slew of ever-changing and always-insufficient wordpress hooks (e.g. [This plugin](https://wordpress.org/plugins/root-relative-urls/))
 2. Wrapping the request early-on with php output buffers and rewriting the URLs. (e.g. https://stackoverflow.com/questions/17187437/relative-urls-in-wordpress#comment88928219_18516783)
 
-But these have always been insufficient - they dont handle all headers, maybe dont work early or late enough in the request, dont handle redirects perfectly, etc...
+But these have always been insufficient - they don't handle all headers, maybe don't work early or late enough in the request, don't handle redirects perfectly, etc...
 
-Pushes for changes in WP Core (https://core.trac.wordpress.org/ticket/17048) have been resoudingly rejected. [Wordpress will always only ever work with absolute URLs](https://make.wordpress.org/core/handbook/contribute/design-decisions/#absolute-versus-relative-urls).
+Pushes for changes in WP Core (https://core.trac.wordpress.org/ticket/17048) have been resoundingly rejected. [Wordpress will always only ever work with absolute URLs](https://make.wordpress.org/core/handbook/contribute/design-decisions/#absolute-versus-relative-urls).
 
-As is always prudent with WP, dont swim against the tide! Instead, the only options for doing any local development on a Wordpress site have been to:
+As is always prudent with WP, don't swim against the tide! Instead, the only options for doing any local development on a Wordpress site have been to:
 1. Set your hosts file so that requests to the production domain are fulfilled locally. This prevents access to the production site, and also inevitably causes errors when you are turning hosts on and off. DNS caching also gets in the way.
 2. Set a new hostname/fully-qualified DNS (which DDEV makes easy) and do a global search/replace in the database to change the production URL to something like `project.ddev.site`. This is also a hassle. It also prevents you from using DDEV's native capacity for routing *multiple* hostnames and fully-qualified DNS to the same project.
 
