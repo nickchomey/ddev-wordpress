@@ -54,6 +54,8 @@ Because Traefik operates both before and after PHP, there's no possibility of it
 ## Troubleshooting
 It is most likely that you would get errors related to the `wp-config.php` and `wp-config-development.php` mechanism. Inspect those files for errors. Also, if you use something like Bedrock, it may not work at all. Please feel free to report any issues here.
 
+You can also check that the `WPURL` environment variable is correctly set in `.ddev/config.yaml` to the database's production URL. This is necessary for the relative paths to work.
+
 
 # Reference Notes from the Add-on Template for outstanding tasks
 ## Components of the repository
