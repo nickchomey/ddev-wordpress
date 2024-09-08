@@ -40,12 +40,18 @@ http:
           # By default, the Last-Modified header is removed.
           lastModified: "true"
           rewrites:
+            - regex: (<input[^>]*?name="(siteurl|home)"[^>]*?value="http://){{ WPURL }}
+              replacement: ${1}placeholder.com
             - regex: (https?)?(%3A|:)?(%2F|\/|\\/|\\%2F)(%2F|\/|\\/|\\%2F){{ WPURL }}(%2F|\/|\\\/|\\%2F)?(.*?)?
               replacement: $4$6
+            - regex: (<input[^>]*?name="(siteurl|home)"[^>]*?value="http://)placeholder\.com
+              replacement: ${1}{{ WPURL }}
           # Available logLevels: (Trace: -2, Debug: -1, Info: 0, Warning: 1, Error: 2)
           logLevel: 0
-          # monitoring is optional, defaults to below configuration
+          # monitoring is optional, defaults to below configuration.
           # monitoring configuration limits the HTTP queries that are checked for regex replacement.
+          # These checks are somewhat "exclusionary" - if you dont set them, then the middleware will proceed with processing. 
+          # If you set them, then the middleware will only process if the request matches the criteria.
           monitoring:
             # methods is a string list. Options are standard HTTP Methods. Entries MUST be ALL CAPS
             # For a list of options: https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods
@@ -56,12 +62,23 @@ http:
             # For a list of options: https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types
             # Wildcards(*) are not supported!
             types:
+              - application/json
               - text/html
-            # checkMimeAccept is a boolean. If true, the Accept header will be checked for the MIME type
-            checkMimeAccept: true
-            # checkMimeContentType is a boolean. If true, the Content-Type header will be checked for the MIME type
+              - text/javascript
+              - application/javascript
+              - application/x-javascript
+              - application/xml
+              - text/xml
+              - text/plain
+              - text/css
+              - application/ld+json
+              - image/svg+xml
+            
+            # checkMimeAccept is a boolean. If true, the Accept header will be checked for the MIME type. Default is false. Probably shouldn't be used at all.
+            checkMimeAccept: false
+            # checkMimeContentType is a boolean. If true, the Content-Type header will be checked for the MIME type. Default is true.
             checkMimeContentType: true
-            # checkAcceptEncoding is a boolean. If true, the Accept-Encoding header will be checked for the encoding
+            # checkAcceptEncoding is a boolean. If true, the Accept-Encoding header will be checked for the encoding. Default is true.
             checkAcceptEncoding: true
-            # checkContentEncoding is a boolean. If true, the Content-Encoding header will be checked for the encoding
+            # checkContentEncoding is a boolean. If true, the Content-Encoding header will be checked for the encoding. Default is true.
             checkContentEncoding: true
