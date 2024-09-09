@@ -31,7 +31,7 @@ project_files:
 # List of files and directories that are copied into the global .ddev directory
 # DDEV environment variables can be interpolated into these filenames
 global_files:
-  #- commands/host/wordpress
+  - commands/host/wordpress
   - traefik/static_config.rewrite_urls.yaml
   - wordpress/dynamic_config.middlewares.yaml
   #- wordpress/wp-config.php
