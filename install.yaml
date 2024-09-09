@@ -45,12 +45,14 @@ dependencies:
 post_install_actions:
   #- ddev delete -O -y
   #- ddev restart -y
-  - rm -f ~/.ddev/commands/host/wordpress
-  - ln -s ~/tool-dev/ddev-wordpress/commands/host/wordpress ~/.ddev/commands/host
+  #- rm -f ~/.ddev/commands/host/wordpress
+  #- ln -s ~/tool-dev/ddev-wordpress/commands/host/wordpress ~/.ddev/commands/host
 
 # Shell actions that can be done during removal of the add-on
 removal_actions:
-# - rm ~/.ddev/commands/web/somecommand
+  # - rm ~/.ddev/commands/web/somecommand
+  - rm -rf ~/.ddev/wordpress
+  - rm -f ~/.ddev/commands/host/wordpress
 
 # Advanced usage - yaml files can be read in and then used as go template actions
 # in pre_install_actions and post_install_actions
