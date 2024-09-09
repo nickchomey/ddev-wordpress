@@ -42,10 +42,16 @@ http:
           rewrites:
             - regex: (<input[^>]*?name="(siteurl|home)"[^>]*?value="http://){{ WPURL }}
               replacement: ${1}placeholder.com
-            - regex: (https?)?(%3A|:)?(%2F|\/|\\/|\\%2F)(%2F|\/|\\/|\\%2F){{ WPURL }}(%2F|\/|\\\/|\\%2F)?(.*?)?
-              replacement: $4$6
+            - regex: {{ WPURL }}
+              replacement: "{RequestHost}"
             - regex: (<input[^>]*?name="(siteurl|home)"[^>]*?value="http://)placeholder\.com
-              replacement: ${1}{{ WPURL }}
+              replacement: "${1}{RequestHost}"
+            # - regex: (<input[^>]*?name="(siteurl|home)"[^>]*?value="http://){{ WPURL }}
+            #   replacement: ${1}placeholder.com
+            # - regex: (https?)?(%3A|:)?(%2F|\/|\\/|\\%2F)(%2F|\/|\\/|\\%2F){{ WPURL }}(%2F|\/|\\\/|\\%2F)?(.*?)?
+            #   replacement: $4$6
+            # - regex: (<input[^>]*?name="(siteurl|home)"[^>]*?value="http://)placeholder\.com
+            #   replacement: ${1}{{ WPURL }}
           # Available logLevels: (Trace: -2, Debug: -1, Info: 0, Warning: 1, Error: 2)
           logLevel: 0
           # monitoring is optional, defaults to below configuration.
