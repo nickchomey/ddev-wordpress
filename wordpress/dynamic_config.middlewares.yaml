@@ -45,7 +45,7 @@ http:
             - regex: {{ WPURL }}
               replacement: "{RequestHost}"
             - regex: (<input[^>]*?name="(siteurl|home)"[^>]*?value="http://)placeholder\.com
-              replacement: "${1}{RequestHost}"
+              replacement: "${1}{{ WPURL }}"
             # - regex: (<input[^>]*?name="(siteurl|home)"[^>]*?value="http://){{ WPURL }}
             #   replacement: ${1}placeholder.com
             # - regex: (https?)?(%3A|:)?(%2F|\/|\\/|\\%2F)(%2F|\/|\\/|\\%2F){{ WPURL }}(%2F|\/|\\\/|\\%2F)?(.*?)?
