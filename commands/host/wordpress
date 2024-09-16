@@ -249,7 +249,9 @@ No SQL files found in the current directory. Please place your database backup f
                 OLD_PROJECT=$(yq e '.name' .ddev/config.yaml)
 
                 # find and recursively remove any files that have OLD_PROJECT in the name. Especially targeting .ddev/traefik
-                find ./.ddev -type f -name "*$OLD_PROJECT*" -exec rm -f {} \;
+                # find ./.ddev -type f -name "*$OLD_PROJECT*" -exec rm -f {} \;
+                rm ./.ddev/traefik/config/*
+                rm ./.ddev/traefik/certs/*
 
                 ddev stop --unlist $CURRENT_DIR
                 # rm .ddev/config.yaml
