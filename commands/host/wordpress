@@ -149,7 +149,7 @@ Download, Create and Install a fresh new WordPress..."
 }
 
 # function to prompt for a new dev URL and then search/replace the production URL with the new dev URL in the DB. Also set ddev config.yaml fqdns to the new dev URL
-update_url() {
+change_url() {
     # get the production URL from the DB
     DBURL=$(ddev exec wp option get siteurl 2>&1 | tail -n 1)
     if [[ $? -ne 0 ]]; then
@@ -290,7 +290,7 @@ No SQL files found in the current directory. Please place your database backup f
 SQL files imported to DDEV Project"
 
     # update the WPURL in the DB and ddev config.yaml
-    update_url
+    change_url
 }
 
 # TODO: tidy this up to reflect actual addon commands and flags
@@ -298,19 +298,23 @@ show_help() {
     echo "Creates a complete WordPress including plugins and wp-cli packages"
     echo ""
     echo "Usage:"
-    echo "  wordpress [flags]"
+    echo "ddev wordpress [command]"
     echo ""
     echo "Examples:"
-    echo "ddev wordpress"
-    echo "ddev wordpress -cliu -clip -wpd"
-    echo ""
-    echo "Flags:"
-    echo "  -cliu, --cli-update     Updates WP-CLI to the latest release"
-    echo "  -clip, --cli-packages   Installs a WP-CLI package"
-    echo "  -d, --delete            Delete the old WordPress (without additional demand)"
-    echo "  -no, --no-install       There is no installation of WordPress"
-    echo "  -wpd, --wp-debug        Additional debug variables are set during the installation"
+    echo "ddev wordpress            Shows Help"
+    echo "ddev wordpress install    Install Fresh Copy of Wordpress"
+    echo "ddev wordpress import     Import Existing WordPress Site and Database"
+    echo "ddev wordpress changeurl  Change the URL of an existing WordPress site"
     echo " "
+    # echo "ddev wordpress -cliu -clip -wpd"
+    # echo ""
+    # echo "Flags:"
+    # echo "  -cliu, --cli-update     Updates WP-CLI to the latest release"
+    # echo "  -clip, --cli-packages   Installs a WP-CLI package"
+    # echo "  -d, --delete            Delete the old WordPress (without additional demand)"
+    # echo "  -no, --no-install       There is no installation of WordPress"
+    # echo "  -wpd, --wp-debug        Additional debug variables are set during the installation"
+    # echo " "
 }
 
 CURRENT_DIR=$(basename "$(pwd)")
@@ -323,23 +327,16 @@ main() {
             show_help
             exit 0
             ;;
-        # install | import | wpconfig | traefik )
-        install | import | wpconfig | updateurl)
+        install | import | changeurl)
             command="$1"
             shift
             ;;
         *)
             show_help
-            exit 1
+            exit 0
             ;;
         esac
     done
-
-    # Check if a command was provided
-    if [ -z "$command" ]; then
-        show_help
-        exit 1
-    fi
 
     # Execute the command
     case "$command" in
@@ -349,15 +346,12 @@ main() {
     import)
         import_wp
         ;;
-    wpconfig)
-        update_wp_config
-        ;;
-    updateurl)
-        update_url
+    changeurl)
+        change_url
         ;;
     *)
         show_help
-        exit 1
+        exit 0
         ;;
     esac
 }
