@@ -3,15 +3,15 @@
 This ddev add-on both simplifies getting started with a WordPress project in DDEV, as well as adds some crucial functionality that addresses fundamental shortcomings with WordPress in a development environment - namely with regards to accessing it via a non-production URL.
 
 ## Challenges of running WordPress in DDEV
-### Different Database credentials
-WordPress sets its database credentials in the wp-config.php file, rather than through any sort of environment variables. So, when we copy a wordpress installation from production to development, we need to change these credentials
+### Different Database and other configurations
+WordPress sets its database, redis and other configurations in the `wp-config.php` file, rather than through any sort of environment variables. So, when we copy a wordpress installation from production to development, we need to change these credentials and other site-wide settings.
 
-An eventual goal (see [issue #1](https://github.com/nickchomey/ddev-wordpress/issues/1)) will be to load everything through environment variables and .env files, but for now we simply prepend the database constant definitions with `defined('CONSTANT') ||` so that the credentials can be pre-emptively loaded from a new `wp-config-development.php` file. This is used, rather than the existing `wp-config-ddev.php` file because `development` is one of the natively supported wordpress [environment types](https://make.wordpress.org/core/2020/08/27/wordpress-environment-types/). Also, it is just generally best to distance ourselves from DDEV's default WordPress configurations.
+An eventual goal (see [issue #1](https://github.com/nickchomey/ddev-wordpress/issues/1)) will be to load everything through environment variables and .env files, but for now we simply create a wrapper `wp-config.php` file that then loads a `wp-config-{environment_type}.php`, depending on which environment (production, staging, development, local) you're in. This is used, rather than the existing `wp-config-ddev.php` file because `development` is one of the natively supported wordpress [environment types](https://make.wordpress.org/core/2020/08/27/wordpress-environment-types/). Also, DDEV's default WordPress configurations just generally create excessive friction.
 
 ### Absolute URL usage
 Wordpress does not have any support for using relative paths. Instead, everything is done with absolute urls - be it internal a href links to other pages, or the urls for loading static assets.
 
-Moreover, it hardcodes the site url in the wp_options table in the database, which can also be configured in wp-config.php.
+Moreover, it hardcodes the site url in the `wp_options` table in the database, which can also be configured in `wp-config.php`.
 
 There have been various attempts over the decades to implement relative paths.
 1. Using a slew of ever-changing and always-insufficient wordpress hooks (e.g. [This plugin](https://wordpress.org/plugins/root-relative-urls/))
@@ -25,9 +25,9 @@ As is always prudent with WP, don't swim against the tide! Instead, the only opt
 1. Set your hosts file so that requests to the production domain are fulfilled locally. This prevents access to the production site, and also inevitably causes errors when you are turning hosts on and off. DNS caching also gets in the way.
 2. Set a new hostname/fully-qualified DNS (which DDEV makes easy) and do a global search/replace in the database to change the production URL to something like `project.ddev.site`. This is also a hassle. It also prevents you from using DDEV's native capacity for routing *multiple* hostnames and fully-qualified DNS to the same project.
 
-This add-on finally solves this problem *completely*, by leveraging the dynamic middleware capabilities of DDEV's Traefik-powered router. It does this by accepting WordPress as it is, and using Traefik's middlewares capabilities to converts any instance of the production URL to a relative path. It does this for Request Headers, Response Headers and the entire contents of the Response Body. This allows you to set as many hostnames/fqdns within DDEV as you like.
+Early pre-release versions of this addon made *extensive* efforts to leverage the dynamic middleware capabilities of DDEV's Traefik-powered router to rewrite the URLs within the request and response body and headers, so as to allow for multiple hostnames to be able to reach a single WP site. However, it was ultimately concluded to be a futile effort. There are too many hidden edge cases - Gutenberg, in particular, has some features that require absolute URLs, and also sends the absolute URLs in the body of various POST requests to the WP Rest API.
 
-Because Traefik operates both before and after PHP, there's no possibility of it "missing" anything. In fact, WordPress doesn't have any knowledge, whatsoever, that it isn't actually being accessed from something other than the production URL in the database!
+In the end, it was determined to be best to stick to the recommendation to replace the production URL in the database with the development URL. Unfortunately wp-cli's search-replace command does not replace everything, so this addon pulls in the OS-appropriate binary of the go-search-replace tool, developed by Automattic and used in their WP VIP service. When you import an existing WP site with this addon, or select its `changeurl` command, it will prompt you for a new URL, export the database to an sql file, run it through go-search-replace, and re-import it.
 
 ## Commands
 * `ddev wordpress install`
@@ -37,9 +37,9 @@ Because Traefik operates both before and after PHP, there's no possibility of it
     - Sets required environment variables in the project's `config.yaml` file
 * `ddev wordpress import`
     * Does the same as `install`, except for it imports an existing wordpress site that you have placed in the current directory
-    * The current directory must contain a sql dump of the site's database (named *.sql.*).
-* `ddev wordpress wpconfig` - Only runs the `wp-config.php` compatibility mechanism used above
-* `ddev wordpress traefik` - Creates a traefik middleware extension config, which allows for converting WordPress' absolute urls to relative paths.
+    * The current directory must contain a sql dump of the site's database (named *.sql.*)
+* `ddev wordpress changeurl` - prompts for a new URL, exports the DB, uses go-search-replace to change the URL, and re-imports it
+
 
 ## Testing it out
 1. Open an existing DDEV Project and install this add-on with `ddev addon get nickchomey/ddev-wordpress`. It will be installed *globally* rather than in the project. This only needs to be done once.
