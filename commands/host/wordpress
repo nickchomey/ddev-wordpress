@@ -223,7 +223,7 @@ import_wp() {
     sql_files=$(find . -maxdepth 1 -type f -name "*.sql*")
     if [ -z "$sql_files" ]; then
         echo "
-No SQL files found in the current directory. Please place your database backup file in the wordpress root directory and try again."
+No SQL files found in the current directory. Please place your database backup file (.sql or .sql.gz) in the wordpress root directory and try again."
         exit 0
     fi
 
@@ -280,6 +280,8 @@ No SQL files found in the current directory. Please place your database backup f
     ddev exec wp config set WP_DEBUG true --config-file="wp-config-development.php"
     ddev exec wp config set WP_DEBUG_LOG true --config-file="wp-config-development.php"
     ddev exec wp config set WP_DEBUG_DISPLAY false --config-file="wp-config-development.php"
+    ddev exec wp config delete WP_HOME --config-file="wp-config-development.php"
+    ddev exec wp config delete WP_SITEURL --config-file="wp-config-development.php"
 
     # start the project so that wp-cli can be used to set things up
     ddev restart
