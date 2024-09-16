@@ -45,222 +45,6 @@
 # pre-restore-snapshot
 # post-restore-snapshot: Execute as the name suggests.
 
-create_ddev_project() {
-    # local WPURL="$1"
-
-    # ddev config --project-type=wordpress --web-environment-add="WP_ENVIRONMENT_TYPE=development,WPURL=$WPURL" --disable-settings-management=true --php-version=8.1
-
-    # dont set WPURL because no longer doing the traefik stuff
-    ddev config --project-type=wordpress --web-environment-add="WP_ENVIRONMENT_TYPE=development" --disable-settings-management=true --php-version=8.1
-
-    # None of this needed, as can just set it with ddev config command. Keep around for future reference
-
-    # # add WP_ENVIRONMENT_TYPE to config.yaml, so that wp-config-development.php is used going forward. Sets it to "development", regardless of what it was before.
-
-    # # Remove any existing WP_ENVIRONMENT_TYPE entries and re-add it as development
-    # yq e 'del(.web_environment[] | select(test("WP_ENVIRONMENT_TYPE"))) ' -i .ddev/config.yaml
-    # yq e '.web_environment += ["WP_ENVIRONMENT_TYPE=development"]' -i .ddev/config.yaml
-
-    # Add the WPURL entry, set to the value provided as the production URL that is stored in the DB. This will be used by Traefik Middleware to rewrite URLs in the HTML response to be relative paths, such that any URL can be used to access the site while maintaining URL in DB as production - keeps the database consistent and clean, without any search/replace mess
-    # yq e 'del(.web_environment[] | select(test("WPURL"))) ' -i .ddev/config.yaml
-    # yq e ".web_environment += [\"WPURL=$WPURL\"]" -i .ddev/config.yaml
-
-    # yq e ".disable_settings_management = false" -i .ddev/config.yaml
-
-    # set php to 8.1 because it has better compatibility with Wordpress
-    # as of WP 6.6, php 8.2 is "compatible, with exceptions" while 8.3 has "beta support"
-    # https://make.wordpress.org/core/handbook/references/php-compatibility-and-wordpress-versions/
-    # yq e '.php_version = "8.1"' -i .ddev/config.yaml
-
-    # dont need to do this now that I'm just injecting what's necessary into the existing wp-config.php - be it from an import or from a fresh install
-    # rm -f ./wp-config*.php
-
-    # copy our wp-config-envtype files to the project directory
-    cp -f ~/.ddev/wordpress/wp-config-development.php ./wp-config-development.php
-    cp -f ~/.ddev/wordpress/wp-config-production.php ./wp-config-production.php
-
-    mv -f ~/wp-config.php wp-config-production.php        # rename the wp-config.php file to wp-config-production.php, overwriting the template one if it exists because this is an import
-    cp -f ~/.ddev/wordpress/wp-config.php ./wp-config.php # add our custom wp-config.php loader
-
-}
-
-update_wp_config() {
-
-    # check if there is a wp-config.php file in the project directory. If not, check if there's wp-config-sample.php and copy it to wp-config.php
-
-    # # Find all wp-config.php files and echo their names
-    # wp_config_files=$(find . -maxdepth 1 -type f -name "wp-config*.php")
-    # for file in $wp_config_files; do
-    #     echo "$file"
-    # done
-
-    # if [ ! -f "wp-config.php" ]; then
-    #     if [ -f "wp-config-sample.php" ]; then
-    #         # TODO: perhaps change this to use `wp config create`
-    #         mv wp-config-sample.php wp-config.php
-    #     else
-    #         echo "No wp-config.php found in the project directory. Creating new one."
-    #         ddev exec wp config create --dbname=db --dbuser=db --dbpass=db --dbhost=db
-    #     fi
-    # fi
-
-    if [ -f "wp-config.php" ]; then
-
-        # check if the WP_ENVIRONMENT_TYPE check and selection mechanism is already in the wp-config.php file
-        # if it is, then don't add it again
-        # look for "Dynamic site configuration depending on the environment type" in the file
-        if ! grep -q "Dynamic site configuration depending on the environment type" wp-config.php; then
-
-            # insert the WP_ENVIRONMENT_TYPE check and selection mechanism into the top of wp-config.php
-            # this will allow for the existing or default/stock-installed wp-config.php to be used, but for ddev-specific constants to override where necessary
-            code_to_insert=$(
-                cat <<'EOF'
-
-// wp-config-ddev.php not needed
-
-/*
-Dynamic site configuration depending on the environment type.
-
-Requires/includes wp-config-{WP_ENVIRONMENT_TYPE}.php if we're not in production, to pre-emptively override the production defaults below
-
-DDEV sets WP_ENVIRONMENT_TYPE to "development" by default and has created a wp-config-development.php file adjacent to wp-config.php.
-
-If you would like to set other environment configs, you can set WP_ENVIRONMENT_TYPE to "local" or "staging" in your project's .ddev/config.yaml's web_environment parameter. Then create a commensurate wp-config-{WP_ENVIRONMENT_TYPE}.php file to be loaded in that environment.
-
-*/
-
-$env_type = getenv("WP_ENVIRONMENT_TYPE") ?: "production";
-
-if ($env_type != "production" ) {
-    $environment_settings = dirname(__FILE__) . "/wp-config-$env_type.php";
-    if (is_readable($environment_settings)){
-        require_once($environment_settings);
-    } else {
-        // exit the request until the environment_type and config files are set up appropriately
-        
-        http_response_code(500);
-        echo("No $environment_settings file found. Look at wp-config.php and create a wp-config-$env_type.php file, and set the WP_ENVIRONMENT_TYPE.");
-        exit();
-    }
-}
-EOF
-            )
-
-            # Create a temporary file with the code to be inserted
-            temp_file=$(mktemp)
-            echo "$code_to_insert" >"$temp_file"
-
-            # Insert the code into wp-config.php after the opening <?php tag
-            sed -i "/<?php/r $temp_file" wp-config.php
-
-            # Clean up the temporary file
-            rm "$temp_file"
-
-            # add defined()|| to the beginning of each define() statement in wp-config.php so that the constants are not redefined if they already exist in other environment config files
-            sed -i -E "/^\s*define\s*\(\s*'DB_(NAME|USER|PASSWORD|HOST)'\s*,\s*['\"][^'\"]*['\"]\s*\)\s*;/ s/^\s*define\s*\(\s*'([^']*)'\s*,\s*['\"]([^'\"]*)['\"]\s*\)\s*;/defined('\1') || define('\1', '\2');/" wp-config.php
-
-            # not needed now that only targeting specific constants
-            # delete any line that contains 'put your unique phrase here'
-            #sed -i '/put your unique phrase here/d' wp-config.php
-
-        fi
-
-        # Generate new salts
-        ddev exec wp config shuffle-salts
-
-        # check if wp_siteurl and wp_home are set in the wp-config.php file, and delete them if so
-
-        # Remove lines containing WP_SITEURL and WP_HOME using sed
-        sed -i '/WP_SITEURL/d' wp-config.php
-        sed -i '/WP_HOME/d' wp-config.php
-
-    fi
-
-    # # TODO: Need to extract this so that the values are passed in as arguments
-    # # Declare an associative array
-    # declare -A replacements=(
-    #     ["{{ \$config.DatabaseName }}"]="db"
-    #     ["{{ \$config.DatabaseUsername }}"]="db"
-    #     ["{{ \$config.DatabasePassword }}"]="db"
-    #     ["{{ \$config.DbCharset }}"]="utf8mb4"
-    #     ["{{ \$config.DbCollate }}"]=""
-    #     ["{{ \$config.AbsPath }}"]="/var/www/html"
-    # )
-
-    # file1="./wp-config.php"
-    # file2="./wp-config-development.php"
-
-    # # Convert associative array to positional parameters
-    # args=()
-    # for key in "${!replacements[@]}"; do
-    #     args+=("$key" "${replacements[$key]}")
-    # done
-
-    # # Perform replacements
-    # sed_replace "$file1" "${args[@]}"
-    # sed_replace "$file2" "${args[@]}"
-
-    echo "
-wp-config.php updated."
-}
-
-process_wp_config() {
-    # get environment type passed in
-    local env_type="$1"
-
-    ddev exec wp config shuffle-salts --config-file="wp-config-$env_type.php"
-}
-
-update_traefik_config() {
-    mkdir -p ./.ddev/traefik && cp -f ~/.ddev/wordpress/dynamic_config.middlewares.yaml ./.ddev/traefik/dynamic_config.middlewares.yaml
-
-    # TODO: probably should do something that copies and overwrites template from global directory to the current project directory, so that it can update the WPURL value if it was changed after being initially set
-
-    local WPURL
-    WPURL=$(yq e '.web_environment[] | select(. == "WPURL=*")' .ddev/config.yaml | sed 's/WPURL=//')
-
-    # Declare an associative array
-    declare -A replacements=(
-        ["{{ \.App.Name }}"]=$(basename "$(pwd)")
-        ["{{ WPURL }}"]=$WPURL
-    )
-
-    file1="./.ddev/traefik/dynamic_config.middlewares.yaml"
-
-    # Convert associative array to positional parameters
-    args=()
-    for key in "${!replacements[@]}"; do
-        args+=("$key" "${replacements[$key]}")
-    done
-
-    # Perform replacements
-    sed_replace "$file1" "${args[@]}"
-
-    echo "Traefik config updated."
-}
-
-sed_replace() {
-    local targetFile="$1"
-    shift
-    declare -A arr
-
-    while (($#)); do
-        key="${1//[\'\"]/}"
-        value="${2//[\'\"]/}"
-
-        # Check if key is non-empty
-        if [[ -n "$key" ]]; then
-            arr[$key]="$value"
-        fi
-
-        shift 2
-    done
-
-    for key in "${!arr[@]}"; do
-        sed -i "s|$key|${arr[$key]}|g" "$targetFile"
-    done
-}
-
 prompt_for_input() {
     local prompt="$1"
     local var_name="$2"
@@ -320,15 +104,11 @@ download_install_wp() {
     echo "
 Download, Create and Install a fresh new WordPress..."
 
-    # create_ddev_project $WPURL
-    # create_ddev_project
     ddev config --project-type=wordpress --web-environment-add="WP_ENVIRONMENT_TYPE=development" --disable-settings-management=true --php-version=8.2
 
     cp -f ~/.ddev/wordpress/wp-config-development.php ./wp-config-development.php
     cp -f ~/.ddev/wordpress/wp-config-production.php ./wp-config-production.php
     cp -f ~/.ddev/wordpress/wp-config.php ./wp-config.php
-
-    # mv -f ~/wp-config.php wp-config-production.php # rename the wp-config.php file to wp-config-production.php, overwriting the template one if it exists because this is an import
 
     # start project container so that wp-cli can be used to set things up
     ddev restart
@@ -337,18 +117,11 @@ Download, Create and Install a fresh new WordPress..."
     ddev exec wp core download
 
     #set up our wp-config.php files
-    # update_wp_config
-    # process_wp_config production
-    # process_wp_config development
     ddev exec wp config shuffle-salts --config-file="wp-config-production.php"
     ddev exec wp config shuffle-salts --config-file="wp-config-development.php"
 
     # install WP
     ddev exec wp core install --url=$WPURL --title=$WP_TITLE --admin_user=$WP_ADMIN_USER --admin_password=$WP_ADMIN_PASSWORD --admin_email=$WP_ADMIN_EMAIL --skip-email
-
-    # replace template placeholders in traefik dynamic config
-    # dont use this anymore - simply impossible to do relative paths or rewrite hostname. just change db url
-    #update_traefik_config
 
     ## empties a site of its content (posts, comments, terms, and meta)
     ddev exec wp site empty --uploads --yes
@@ -373,15 +146,6 @@ Download, Create and Install a fresh new WordPress..."
         ## install wp-cli packages
         ddev exec wp package install "$WP_DDEV_CLI_PACKAGES"
     fi
-
-    #  not needed now that we're not using traefik
-    #     echo "************************************************************
-
-    # Restarting DDEV Project now to complete the process
-
-    # ************************************************************"
-
-    #     ddev restart
 }
 
 # function to prompt for a new dev URL and then search/replace the production URL with the new dev URL in the DB. Also set ddev config.yaml fqdns to the new dev URL
