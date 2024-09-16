@@ -13,11 +13,35 @@ http:
         - {{ .App.Name }}-change-request-headers
       
   middlewares:
+    # {{ .App.Name }}-change-request-headers:
+    #   headers:
+    #     customRequestHeaders:
+    #       Host: "{{ WPURL }}"
+    #       X-Forwarded-Host: "{{ WPURL }}"
     {{ .App.Name }}-change-request-headers:
-      headers:
-        customRequestHeaders:
-          Host: "{{ WPURL }}"
-          X-Forwarded-Host: "{{ WPURL }}"
+      plugin:
+        htransformation:
+          Rules:
+            - Name: Referer Header Rewrite
+              Header: Referer
+              Value: ((https?)?(%3A|:)?(%2F|\/|\\/|\\%2F)(%2F|\/|\\/|\\%2F))?([^\/]+)(%2F|\/|\\\/|\\%2F)?(.*?)?
+              ValueReplace: $1nick.com$7$8
+              Type: "RewriteValueRule"
+            - Name: Origin Header Rewrite
+              Header: Origin
+              Value: ((https?)?(%3A|:)?(%2F|\/|\\/|\\%2F)(%2F|\/|\\/|\\%2F))?([^\/]+)(%2F|\/|\\\/|\\%2F)?(.*?)?
+              ValueReplace: $1nick.com$7$8
+              Type: "RewriteValueRule"
+            - Name: Host Header Rewrite
+              Header: Host
+              Value: ((https?)?(%3A|:)?(%2F|\/|\\/|\\%2F)(%2F|\/|\\/|\\%2F))?([^\/]+)(%2F|\/|\\\/|\\%2F)?(.*?)?
+              ValueReplace: $1nick.com$7$8
+              Type: "RewriteValueRule"
+            - Name: X-Forwarded-Host Header Rewrite
+              Header: X-Forwarded-Host
+              Value: ((https?)?(%3A|:)?(%2F|\/|\\/|\\%2F)(%2F|\/|\\/|\\%2F))?([^\/]+)(%2F|\/|\\\/|\\%2F)?(.*?)?
+              ValueReplace: $1nick.com$7$8
+              Type: "RewriteValueRule"
     {{ .App.Name }}-redirectHttps:
       redirectScheme:
         scheme: https

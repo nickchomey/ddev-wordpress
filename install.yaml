@@ -7,11 +7,170 @@ name: ddev-wordpress
 # or doing a sanity check for requirements.
 # DDEV environment variables can be interpolated into these actions
 pre_install_actions:
-  - rm -rf ~/.ddev/wordpress
-  - mkdir ~/.ddev/wordpress
-  - rm -f ~/.ddev/commands/host/wordpress
-  #- rm wp-config*.php
-  # Actions with #ddev-nodisplay will not show the execution of the action, but may show their output
+    - rm -rf ~/.ddev/wordpress
+    - mkdir ~/.ddev/wordpress
+    - rm -f ~/.ddev/commands/host/wordpress
+    - |
+
+        ARCH=""
+        OS=""
+        ID=""
+
+        # Function to determine architecture
+        get_architecture() {
+            local arch
+            arch=$(uname -m)
+            case "$arch" in
+            x86_64)
+                ARCH="amd64"
+                ;;
+            arm64 | aarch64)
+                ARCH="arm64"
+                ;;
+            armv6l)
+                ARCH="armv6"
+                ;;
+            *)
+                echo "Unsupported CPU architecture for go-search-replace: $arch"
+                exit 1
+                ;;
+            esac
+        }
+
+        # Function to determine OS
+        get_os_info() {
+            if command -v lsb_release >/dev/null 2>&1; then
+                # Use lsb_release if available
+                ID=$(lsb_release -si | tr '[:upper:]' '[:lower:]')
+            elif [ -f /etc/os-release ]; then
+                # Fallback to /etc/os-release
+                . /etc/os-release
+            else
+                # Use uname as a last resort
+                case "$(uname -s)" in
+                Linux)
+                    if [ -f /etc/centos-release ]; then
+                        if grep -q "CentOS Stream" /etc/centos-release; then
+                            ID="centos_stream"
+                        else
+                            ID="centos"
+                        fi
+                    elif [ -f /etc/debian_version ]; then
+                        ID="debian"
+                    else
+                        ID="linux"
+                    fi
+                    ;;
+                Darwin)
+                    ID="darwin"
+                    ;;
+                CYGWIN* | MINGW32* | MSYS* | MINGW*)
+                    ID="windows"
+                    ;;
+                *)
+                    echo "Unsupported OS"
+                    exit 1
+                    ;;
+                esac
+            fi
+        }
+
+        # Function to set OS based on ID
+        set_os_based_on_id() {
+            case $ID in
+            amzn | debian | ubuntu | rhel | centos)
+                OS="linux"
+                ;;
+            darwin)
+                OS="darwin"
+                ;;
+            windows)
+                OS="windows"
+                ;;
+            *)
+                echo "Unsupported OS: $ID"
+                exit 1
+                ;;
+            esac
+        }
+
+        download_go-search-replace() {
+            version=$(~/.ddev/bin/go-search-replace -version 2>/dev/null)
+            if [ $? -ne 0 ]; then
+                echo "
+        go-search-replace is not installed"
+                extracted_version=""
+            else
+                extracted_version=$(echo "$version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+                echo "
+        Current go-search-replace version: $extracted_version"
+            fi
+
+            # Get the latest release information from the GitHub API
+            echo "
+        Checking for the latest go-search-replace version..."
+
+            # sometimes I have dns issues with Github that causes this to fail
+            latest_release_info=$(curl -s "https://api.github.com/repos/nickchomey/go-search-replace/releases/latest")
+            if [ $? -ne 0 ]; then
+                echo "Request for go-search-replace release info failed. Please try again later."
+                return
+            fi
+
+            # Extract the tag name from the latest release information
+            latest_tag=$(echo "$latest_release_info" | jq -r '.tag_name')
+
+            formatted_tag=${latest_tag#v}
+            echo "
+        Latest go-search-replace version: $latest_tag"
+            if [[ "$extracted_version" == "$formatted_tag" ]]; then
+                echo "
+        go-search-replace is already up to date"
+                return
+            fi
+
+            # Construct the download URL using the latest tag
+            download_url="https://github.com/nickchomey/go-search-replace/releases/download/${latest_tag}/go-search-replace_${formatted_tag}_${OS}_${ARCH}.tar.gz"
+
+            echo "
+        Downloading go-search-replace ${latest_tag} for ${OS}_${ARCH}... from $download_url"
+
+            # Download the .tar.gz file to a temporary location
+            curl -L "$download_url" -o /tmp/go-search-replace.tar.gz
+
+            # Unpack the .tar.gz file
+            tar -xzf /tmp/go-search-replace.tar.gz -C /tmp
+
+            # Move the extracted file(s) to the desired location
+            # Assuming 'go-search-replace' is the name of the binary in the tarball
+            mv -f /tmp/go-search-replace ~/.ddev/bin/
+
+            # Clean up the temporary .tar.gz file
+            rm /tmp/go-search-replace.tar.gz
+
+            #curl -L $download_url | tar -xz -C ~/.ddev/bin
+            sudo chmod +x ~/.ddev/bin/go-search-replace
+
+            echo "
+        go-search-replace ${latest_tag} has been installed"
+        }
+
+        install_gsr() {
+            # Determine architecture
+            get_architecture
+
+            # Determine OS and version
+            get_os_info
+
+            # Set OS based on ID
+            set_os_based_on_id
+
+            # Install go-search-replace if not already installed
+            download_go-search-replace
+        }
+
+    #- rm wp-config*.php
+    # Actions with #ddev-nodisplay will not show the execution of the action, but may show their output
 # - |
 # #ddev-nodisplay
 #ddev-description:Check architecture type for incompatible arm64 type
@@ -27,15 +186,17 @@ pre_install_actions:
 # If you use directories, they must be directories that are managed
 # by this add-on, or removal could remove things that are not owned by it
 project_files:
-  # - commands/web/wordpress
+    # - commands/web/wordpress
 # List of files and directories that are copied into the global .ddev directory
 # DDEV environment variables can be interpolated into these filenames
 global_files:
-  - commands/host/wordpress
-  - traefik/static_config.rewrite_urls.yaml
-  - wordpress/dynamic_config.middlewares.yaml
-  #- wordpress/wp-config.php
-  - wordpress/wp-config-development.php
+    - commands/host/wordpress
+    - wordpress/wp-config.php
+    - wordpress/wp-config-development.php
+    - wordpress/wp-config-production.php
+    # dont use traefik anymore. Simply impossible. Just change the DB URL.
+    #- traefik/static_config.rewrite_urls.yaml
+    #- wordpress/dynamic_config.middlewares.yaml
 
 # List of add-on names that this add-on depends on
 dependencies:
@@ -43,16 +204,18 @@ dependencies:
 
 # DDEV environment variables can be interpolated into these actions
 post_install_actions:
-  #- ddev delete -O -y
-  #- ddev restart -y
-  #- rm -f ~/.ddev/commands/host/wordpress
-  #- ln -s ~/tool-dev/ddev-wordpress/commands/host/wordpress ~/.ddev/commands/host
+    #- ddev delete -O -y
+    #- ddev restart -y
+    - rm -f ~/.ddev/commands/host/wordpress
+    - ln -s ~/tool-dev/ddev-wordpress/commands/host/wordpress ~/.ddev/commands/host
+    - rm -rf ~/.ddev/wordpress
+    - ln -s ~/tool-dev/ddev-wordpress/wordpress ~/.ddev/wordpress
 
 # Shell actions that can be done during removal of the add-on
 removal_actions:
-  # - rm ~/.ddev/commands/web/somecommand
-  - rm -rf ~/.ddev/wordpress
-  - rm -f ~/.ddev/commands/host/wordpress
+    # - rm ~/.ddev/commands/web/somecommand
+    - rm -rf ~/.ddev/wordpress
+    - rm -f ~/.ddev/commands/host/wordpress
 
 # Advanced usage - yaml files can be read in and then used as go template actions
 # in pre_install_actions and post_install_actions

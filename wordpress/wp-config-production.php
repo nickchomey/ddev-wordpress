@@ -1,22 +1,17 @@
 <?php
 
-/**
- * #ddev-generated: Automatically generated WordPress settings file.
- * ddev manages this file and may delete or overwrite the file unless this comment is removed.
- *
- * @package ddevapp
- */
+// ** Production site database settings - You can get this info from your web host ** //
 
 /** The name of the database for WordPress */
-define('DB_NAME', 'db');
+define('DB_NAME', '{{ $config.DatabaseName }}');
 
-/** MySQL database username */
-define('DB_USER', 'db');
+/** Database username */
+define('DB_USER', '{{ $config.DatabaseUsername }}');
 
-/** MySQL database password */
-define('DB_PASSWORD', 'db');
+/** Database password */
+define('DB_PASSWORD', '{{ $config.DatabasePassword }}');
 
-/** MySQL hostname */
+/** Database hostname */
 define('DB_HOST', 'db');
 
 /** Database charset to use in creating database tables. */
@@ -24,7 +19,6 @@ define('DB_CHARSET', 'utf8mb4');
 
 /** The database collate type. Don't change this if in doubt. */
 define('DB_COLLATE', '');
-
 
 /**#@+
  * Authentication unique keys and salts.
@@ -72,6 +66,6 @@ if (!isset($table_prefix) || empty($table_prefix)) {
  *
  * @link https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/
  */
-define('WP_DEBUG', true);
-define('WP_DEBUG_LOG', true);
+define('WP_DEBUG', false);
+define('WP_DEBUG_LOG', false);
 define('WP_DEBUG_DISPLAY', false);

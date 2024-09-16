@@ -44,43 +44,14 @@
 # post-delete-snapshot
 # pre-restore-snapshot
 # post-restore-snapshot: Execute as the name suggests.
-prompt_for_input() {
-    local prompt="$1"
-    local var_name="$2"
-    while true; do
-        read -r -p "$prompt: " input
-        if [ -z "$input" ]; then
-            echo "$prompt is required."
-        else
-            eval "$var_name=\$input"
-            break
-        fi
-    done
-}
-
-show_help() {
-    echo "Creates a complete WordPress including plugins and wp-cli packages"
-    echo ""
-    echo "Usage:"
-    echo "  wordpress [flags]"
-    echo ""
-    echo "Examples:"
-    echo "ddev wordpress"
-    echo "ddev wordpress -cliu -clip -wpd"
-    echo ""
-    echo "Flags:"
-    echo "  -cliu, --cli-update     Updates WP-CLI to the latest release"
-    echo "  -clip, --cli-packages   Installs a WP-CLI package"
-    echo "  -d, --delete            Delete the old WordPress (without additional demand)"
-    echo "  -no, --no-install       There is no installation of WordPress"
-    echo "  -wpd, --wp-debug        Additional debug variables are set during the installation"
-    echo " "
-}
 
 create_ddev_project() {
-    local WPURL="$1"
+    # local WPURL="$1"
 
-    ddev config --project-type=wordpress --web-environment-add="WP_ENVIRONMENT_TYPE=development,WPURL=$WPURL" --disable-settings-management=true --php-version=8.1
+    # ddev config --project-type=wordpress --web-environment-add="WP_ENVIRONMENT_TYPE=development,WPURL=$WPURL" --disable-settings-management=true --php-version=8.1
+
+    # dont set WPURL because no longer doing the traefik stuff
+    ddev config --project-type=wordpress --web-environment-add="WP_ENVIRONMENT_TYPE=development" --disable-settings-management=true --php-version=8.1
 
     # None of this needed, as can just set it with ddev config command. Keep around for future reference
 
@@ -103,30 +74,35 @@ create_ddev_project() {
 
     # dont need to do this now that I'm just injecting what's necessary into the existing wp-config.php - be it from an import or from a fresh install
     # rm -f ./wp-config*.php
-    # cp -f ~/.ddev/wordpress/wp-config.php ./wp-config.php
 
+    # copy our wp-config-envtype files to the project directory
     cp -f ~/.ddev/wordpress/wp-config-development.php ./wp-config-development.php
+    cp -f ~/.ddev/wordpress/wp-config-production.php ./wp-config-production.php
+
+    mv -f ~/wp-config.php wp-config-production.php        # rename the wp-config.php file to wp-config-production.php, overwriting the template one if it exists because this is an import
+    cp -f ~/.ddev/wordpress/wp-config.php ./wp-config.php # add our custom wp-config.php loader
 
 }
 
 update_wp_config() {
 
     # check if there is a wp-config.php file in the project directory. If not, check if there's wp-config-sample.php and copy it to wp-config.php
-    # Find all wp-config.php files and echo their names
-    wp_config_files=$(find . -maxdepth 1 -type f -name "wp-config*.php")
-    for file in $wp_config_files; do
-        echo "$file"
-    done
 
-    if [ ! -f "wp-config.php" ]; then
-        if [ -f "wp-config-sample.php" ]; then
-            # TODO: perhaps change this to use `wp config create`
-            mv wp-config-sample.php wp-config.php
-        else
-            echo "No wp-config.php or wp-config-sample.php found in the project directory. Exiting."
-            exit 1
-        fi
-    fi
+    # # Find all wp-config.php files and echo their names
+    # wp_config_files=$(find . -maxdepth 1 -type f -name "wp-config*.php")
+    # for file in $wp_config_files; do
+    #     echo "$file"
+    # done
+
+    # if [ ! -f "wp-config.php" ]; then
+    #     if [ -f "wp-config-sample.php" ]; then
+    #         # TODO: perhaps change this to use `wp config create`
+    #         mv wp-config-sample.php wp-config.php
+    #     else
+    #         echo "No wp-config.php found in the project directory. Creating new one."
+    #         ddev exec wp config create --dbname=db --dbuser=db --dbpass=db --dbhost=db
+    #     fi
+    # fi
 
     if [ -f "wp-config.php" ]; then
 
@@ -156,17 +132,14 @@ If you would like to set other environment configs, you can set WP_ENVIRONMENT_T
 $env_type = getenv("WP_ENVIRONMENT_TYPE") ?: "production";
 
 if ($env_type != "production" ) {
-    $ddev_settings = dirname(__FILE__) . "/wp-config-$env_type.php";
-    if (is_readable($ddev_settings)){
-        require_once($ddev_settings);
+    $environment_settings = dirname(__FILE__) . "/wp-config-$env_type.php";
+    if (is_readable($environment_settings)){
+        require_once($environment_settings);
     } else {
-        //TODO: this is probably not going to actually log anything, because logging gets set up later.
-        error_log("No $ddev_settings file found. Using defaults. If the site is not working, look at wp-config.php and create a wp-config-$env_type.php file, and set the WP_ENVIRONMENT_TYPE.");
-        
         // exit the request until the environment_type and config files are set up appropriately
         
         http_response_code(500);
-        echo("No $ddev_settings file found. Using defaults. If the site is not working, look at wp-config.php and create a wp-config-$env_type.php file, and set the WP_ENVIRONMENT_TYPE.");
+        echo("No $environment_settings file found. Look at wp-config.php and create a wp-config-$env_type.php file, and set the WP_ENVIRONMENT_TYPE.");
         exit();
     }
 }
@@ -184,7 +157,7 @@ EOF
             rm "$temp_file"
 
             # add defined()|| to the beginning of each define() statement in wp-config.php so that the constants are not redefined if they already exist in other environment config files
-            sed -i -E "/^\s*define\s*\(\s*'DB_(NAME|USER|PASSWORD|HOST)'\s*,\s*'[^']*'\s*\)\s*;/ s/^\s*define\s*\(\s*'([^']*)'\s*,\s*'([^']*)'\s*\)\s*;/defined('\1') || define('\1', '\2');/" wp-config.php
+            sed -i -E "/^\s*define\s*\(\s*'DB_(NAME|USER|PASSWORD|HOST)'\s*,\s*['\"][^'\"]*['\"]\s*\)\s*;/ s/^\s*define\s*\(\s*'([^']*)'\s*,\s*['\"]([^'\"]*)['\"]\s*\)\s*;/defined('\1') || define('\1', '\2');/" wp-config.php
 
             # not needed now that only targeting specific constants
             # delete any line that contains 'put your unique phrase here'
@@ -194,6 +167,13 @@ EOF
 
         # Generate new salts
         ddev exec wp config shuffle-salts
+
+        # check if wp_siteurl and wp_home are set in the wp-config.php file, and delete them if so
+
+        # Remove lines containing WP_SITEURL and WP_HOME using sed
+        sed -i '/WP_SITEURL/d' wp-config.php
+        sed -i '/WP_HOME/d' wp-config.php
+
     fi
 
     # # TODO: Need to extract this so that the values are passed in as arguments
@@ -220,7 +200,15 @@ EOF
     # sed_replace "$file1" "${args[@]}"
     # sed_replace "$file2" "${args[@]}"
 
-    echo "wp-config.php updated."
+    echo "
+wp-config.php updated."
+}
+
+process_wp_config() {
+    # get environment type passed in
+    local env_type="$1"
+
+    ddev exec wp config shuffle-salts --config-file="wp-config-$env_type.php"
 }
 
 update_traefik_config() {
@@ -273,67 +261,94 @@ sed_replace() {
     done
 }
 
+prompt_for_input() {
+    local prompt="$1"
+    local var_name="$2"
+    local default_value="$3"
+    while true; do
+        read -r -p "$prompt (default: $default_value): " input
+        if [ -z "$input" ]; then
+            if [ -z "$default_value" ]; then
+                echo "$prompt is required."
+            else
+                eval "$var_name=\$default_value"
+                break
+            fi
+        else
+            eval "$var_name=\$input"
+            break
+        fi
+    done
+}
+
 download_install_wp() {
 
-    WP_TITLE="ddevtest1"
-    WPURL="ddevtest1.com"
+    WP_TITLE="$CURRENT_DIR"
+    WPURL="$CURRENT_DIR.ddev.site"
     WP_ADMIN_USER="admin"
     WP_ADMIN_PASSWORD="1357531"
-    WP_ADMIN_EMAIL="asdf@asdf.com"
 
-    # If $DEBUG env variable exists, then dont prompt for input and just use the defaults set above.
-    # can set manually in terminal with --debug flag or with vscode launch.json arg
+    while true; do
+        echo $'\nPlease enter site details. Press Ctrl+C at any time to cancel this command completely.\n'
+        prompt_for_input "Site Title" WP_TITLE "$WP_TITLE"
+        prompt_for_input "Site Development URL ***use a real subdomain to serve it publicly via Cloudflare Tunnels***" WPURL "$WPURL"
+        prompt_for_input "Admin User" WP_ADMIN_USER "$WP_ADMIN_USER"
+        prompt_for_input "Admin Password" WP_ADMIN_PASSWORD "$WP_ADMIN_PASSWORD"
+        WP_ADMIN_EMAIL="$CURRENT_DIR@$WPURL"
+        prompt_for_input "Admin Email" WP_ADMIN_EMAIL "$WP_ADMIN_EMAIL"
 
-    if [ "$DEBUG" = true ]; then
-        echo "DEBUG is set, using default values for site details."
-    else
-        while true; do
-            echo $'\nPlease enter site details. Press Ctrl+C at any time to cancel this command completely.\n'
-            prompt_for_input "Site Title" WP_TITLE
-            prompt_for_input "Site Production URL" WPURL
-            prompt_for_input "Admin User" WP_ADMIN_USER
-            prompt_for_input "Admin Password" WP_ADMIN_PASSWORD
-            prompt_for_input "Admin Email" WP_ADMIN_EMAIL
+        echo $'\nYou have entered the following details:\n'
+        echo "Site Title: $WP_TITLE"
+        echo "Site Production URL: $WPURL"
+        echo "Admin User: $WP_ADMIN_USER"
+        echo "Admin Password: $WP_ADMIN_PASSWORD"
+        echo "Admin Email: $WP_ADMIN_EMAIL"
 
-            echo $'\nYou have entered the following details:\n'
-            echo "Site Title: $WP_TITLE"
-            echo "Site Production URL: $WPURL"
-            echo "Admin User: $WP_ADMIN_USER"
-            echo "Admin Password: $WP_ADMIN_PASSWORD"
-            echo "Admin Email: $WP_ADMIN_EMAIL"
+        read -r -p $'\nAre these details correct? (Y/n): ' confirmation
 
-            read -r -p $'\nAre these details correct? (Y/n): ' confirmation
+        if [ -z "$confirmation" ]; then
+            confirmation="yes"
+        fi
 
-            if [ -z "$confirmation" ]; then
-                confirmation="yes"
-            fi
+        case ${confirmation,,} in
+        y | yes) break ;;
+        n | no) echo -e "\nLet's try again." ;;
+        *) echo "Please answer yes or no." ;;
+        esac
+    done
 
-            case ${confirmation,,} in
-            y | yes) break ;;
-            n | no) echo -e "\nLet's try again." ;;
-            *) echo "Please answer yes or no." ;;
-            esac
-        done
-    fi
+    echo "
+Download, Create and Install a fresh new WordPress..."
 
-    echo "Download, Create and Install a fresh new WordPress..."
+    # create_ddev_project $WPURL
+    # create_ddev_project
+    ddev config --project-type=wordpress --web-environment-add="WP_ENVIRONMENT_TYPE=development" --disable-settings-management=true --php-version=8.2
 
-    create_ddev_project $WPURL
+    cp -f ~/.ddev/wordpress/wp-config-development.php ./wp-config-development.php
+    cp -f ~/.ddev/wordpress/wp-config-production.php ./wp-config-production.php
+    cp -f ~/.ddev/wordpress/wp-config.php ./wp-config.php
+
+    # mv -f ~/wp-config.php wp-config-production.php # rename the wp-config.php file to wp-config-production.php, overwriting the template one if it exists because this is an import
 
     # start project container so that wp-cli can be used to set things up
-    ddev start
+    ddev restart
 
     ## download and install wordpress
     ddev exec wp core download
 
     #set up our wp-config.php files
-    update_wp_config
+    # update_wp_config
+    # process_wp_config production
+    # process_wp_config development
+    ddev exec wp config shuffle-salts --config-file="wp-config-production.php"
+    ddev exec wp config shuffle-salts --config-file="wp-config-development.php"
 
     # install WP
     ddev exec wp core install --url=$WPURL --title=$WP_TITLE --admin_user=$WP_ADMIN_USER --admin_password=$WP_ADMIN_PASSWORD --admin_email=$WP_ADMIN_EMAIL --skip-email
 
     # replace template placeholders in traefik dynamic config
-    update_traefik_config
+    # dont use this anymore - simply impossible to do relative paths or rewrite hostname. just change db url
+    #update_traefik_config
 
     ## empties a site of its content (posts, comments, terms, and meta)
     ddev exec wp site empty --uploads --yes
@@ -359,12 +374,81 @@ download_install_wp() {
         ddev exec wp package install "$WP_DDEV_CLI_PACKAGES"
     fi
 
-    echo "************************************************************
+    #  not needed now that we're not using traefik
+    #     echo "************************************************************
 
-Restarting DDEV Project now to complete the process
+    # Restarting DDEV Project now to complete the process
 
-************************************************************"
+    # ************************************************************"
 
+    #     ddev restart
+}
+
+# function to prompt for a new dev URL and then search/replace the production URL with the new dev URL in the DB. Also set ddev config.yaml fqdns to the new dev URL
+update_url() {
+    # get the production URL from the DB
+    DBURL=$(ddev exec wp option get siteurl 2>&1 | tail -n 1)
+    if [[ $? -ne 0 ]]; then
+        echo "Error: Failed to establish a connection. Please investigate the wp-config.php file for potential issues."
+        echo "Details: $DBURL"
+        exit 1
+    fi
+
+    if [[ $DBURL != http* ]]; then
+        echo "Error: Invalid URL"
+        exit 1
+    fi
+    #strip scheme if it exists
+    DBURL=$(echo $DBURL | sed 's|http[s]*://||')
+
+    prompt_for_input "
+Enter Previous Site URL: " DBURL "$DBURL"
+
+    # get the production URL from the user
+    prompt_for_input "
+Enter New Dev Site URL ***use a real subdomain to serve it publicly via Cloudflare Tunnels***" WPURL "$CURRENT_DIR.ddev.site"
+
+    #strip scheme if it exists
+    WPURL=$(echo $WPURL | sed 's|http[s]*://||')
+    #strip scheme from the url
+    # search/replace the production URL with the WPURL in the DB, replacing http and https with https
+    echo "
+Updating URL in the database from $DBURL to $WPURL..."
+
+    # this doesnt work if tables doesnt have a primary key, column has BLOB type, and other issues
+    # ddev exec wp search-replace "https://$DBURL" "https://$WPURL" --all-tables --precise --recurse-objects
+    # ddev exec wp search-replace "http://$DBURL" "https://$WPURL" --all-tables --precise --recurse-objects
+
+    # export db to sql file
+    echo "
+Exporting DB to SQL file..."
+    ddev export-db --file="db-urlchange.sql" --gzip=false
+
+    echo "
+Replacing URL in SQL file..."
+    # use ~/.ddev/wordpress/go-search-replace to replace the URL in the DB
+    ~/.ddev/bin/go-search-replace "https://$DBURL" "https://$WPURL" <db-urlchange.sql >db-urlchange.sql.tmp
+    ~/.ddev/bin/go-search-replace "http://$DBURL" "https://$WPURL" <db-urlchange.sql.tmp >db-urlchange.sql
+
+    # import the updated SQL file back into the DB
+    echo "
+Importing updated SQL file..."
+    ddev import-db --file="db-urlchange.sql"
+    rm db-urlchange.sql db-urlchange.sql.tmp
+
+    echo "
+Updating URL complete."
+    # update the WPURL in the ddev config.yaml file
+    ddev config --additional-fqdns="$WPURL"
+
+    echo "
+************************************************************
+
+Restarting DDEV Project now to complete the URL Update Process
+
+************************************************************
+"
+    ddev redis-flush
     ddev restart
 }
 
@@ -374,75 +458,107 @@ import_wp() {
 
     sql_files=$(find . -maxdepth 1 -type f -name "*.sql*")
     if [ -z "$sql_files" ]; then
-        echo "No SQL files found in the current directory. Please place your database backup file in the wordpress root directory and try again."
+        echo "
+No SQL files found in the current directory. Please place your database backup file in the wordpress root directory and try again."
         exit 0
     fi
 
     # if there's a ddev project directory, prompt them to either delete it or stop the process and decide what to do
     if [ -d ".ddev" ]; then
         while true; do
-            read -r -p $'\n A .ddev directory already exists in this directory. Do you want to delete it and start a fresh project here? (Y/n): ' delete_ddev
+            read -r -p $'\n A .ddev directory already exists in this directory. Do you want to delete it and start a fresh project here or just update the config with a new name? (y/N): ' delete_ddev
             if [ -z "$delete_ddev" ]; then
-                delete_ddev="yes"
+                delete_ddev="no"
             fi
 
             case ${delete_ddev,,} in
             y | yes)
+                # stop and remove the current ddev project if it exists in ~/.ddev/project_list.yaml
                 rm -rf .ddev/
+
+                # create_ddev_project
+                ddev config --project-type=wordpress --web-environment-add="WP_ENVIRONMENT_TYPE=development" --disable-settings-management=true --php-version=8.2
                 break
                 ;;
             n | no)
-                echo $'\nPlease delete the .ddev directory and try again.'
-                exit 0
+                # get name from .ddev/config.yaml
+                OLD_PROJECT=$(yq e '.name' .ddev/config.yaml)
+
+                # find and recursively remove any files that have OLD_PROJECT in the name. Especially targeting .ddev/traefik
+                find ./.ddev -type f -name "*$OLD_PROJECT*" -exec rm -f {} \;
+
+                ddev stop --unlist $CURRENT_DIR
+                # rm .ddev/config.yaml
+                # just update the config with what's needed
+                ddev config --project-type=wordpress --web-environment-add="WP_ENVIRONMENT_TYPE=development" --disable-settings-management=true --php-version=8.2 --additional-fqdns="" --additional-hostnames="" --project-name=$CURRENT_DIR
+                break
                 ;;
             *) echo -e $'\nPlease answer yes or no.' ;;
             esac
         done
     fi
 
-    # get the production URL from the user
-    prompt_for_input "Site Production URL" WPURL
+    # Create copy of wp-config.php as wp-config-development.php and rename original to wp-config-production.php
+    cp -n wp-config.php wp-config-development.php
+    mv -n wp-config.php wp-config-production.php
+    cp -f ~/.ddev/wordpress/wp-config.php wp-config.php
 
-    # Create ddev project with the provided production URL
-    create_ddev_project "$WPURL"
+    #remove everything after `That's all, stop editing!` line in both wp-config files
+    sed -i '/That.*all.*stop.*editing/q' wp-config-development.php
+    sed -i '/That.*all.*stop.*editing/q' wp-config-production.php
 
-    # start the project so that wp-cli can be used to set things up
     ddev start
 
-    # Update wp-config.php with the WP_ENVIRONMENT_TYPE check and selection mechanism, insert wp-config-development.php, and update the salts
-    update_wp_config
+    ddev exec wp config set DB_HOST db --config-file="wp-config-development.php"
+    ddev exec wp config set DB_NAME db --config-file="wp-config-development.php"
+    ddev exec wp config set DB_USER db --config-file="wp-config-development.php"
+    ddev exec wp config set DB_PASSWORD db --config-file="wp-config-development.php"
+    ddev exec wp config set WP_DEBUG true --config-file="wp-config-development.php"
+    ddev exec wp config set WP_DEBUG_LOG true --config-file="wp-config-development.php"
+    ddev exec wp config set WP_DEBUG_DISPLAY false --config-file="wp-config-development.php"
 
-    # replace template placeholders in traefik dynamic config
-    update_traefik_config
-
-    ddev import-db --file="$sql_files"
-    echo "SQL files imported to DDEV Project"
-
-    echo "************************************************************
-
-Restarting DDEV Project now to complete the import process
-
-************************************************************"
-
+    # start the project so that wp-cli can be used to set things up
     ddev restart
+    ddev import-db --file="$sql_files"
+    echo "
+SQL files imported to DDEV Project"
 
+    # update the WPURL in the DB and ddev config.yaml
+    update_url
 }
 
-DEBUG=false
+# TODO: tidy this up to reflect actual addon commands and flags
+show_help() {
+    echo "Creates a complete WordPress including plugins and wp-cli packages"
+    echo ""
+    echo "Usage:"
+    echo "  wordpress [flags]"
+    echo ""
+    echo "Examples:"
+    echo "ddev wordpress"
+    echo "ddev wordpress -cliu -clip -wpd"
+    echo ""
+    echo "Flags:"
+    echo "  -cliu, --cli-update     Updates WP-CLI to the latest release"
+    echo "  -clip, --cli-packages   Installs a WP-CLI package"
+    echo "  -d, --delete            Delete the old WordPress (without additional demand)"
+    echo "  -no, --no-install       There is no installation of WordPress"
+    echo "  -wpd, --wp-debug        Additional debug variables are set during the installation"
+    echo " "
+}
+
+CURRENT_DIR=$(basename "$(pwd)")
 main() {
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
-        --debug)
-            DEBUG=true
-            shift
-            ;;
         -h | --help)
             show_help
             exit 0
             ;;
-        install | import | wpconfig | traefik | restart)
+        # install | import | wpconfig | traefik )
+        install | import | wpconfig | updateurl)
             command="$1"
             shift
             ;;
@@ -470,8 +586,8 @@ main() {
     wpconfig)
         update_wp_config
         ;;
-    traefik)
-        update_traefik_config
+    updateurl)
+        update_url
         ;;
     *)
         show_help
