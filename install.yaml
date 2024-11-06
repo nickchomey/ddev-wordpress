@@ -111,7 +111,7 @@ pre_install_actions:
         Checking for the latest go-search-replace version..."
 
             # sometimes I have dns issues with Github that causes this to fail
-            latest_release_info=$(curl -s "https://api.github.com/repos/nickchomey/go-search-replace/releases/latest")
+            latest_release_info=$(curl -s "https://api.github.com/repos/Automattic/go-search-replace/releases/latest")
             if [ $? -ne 0 ]; then
                 echo "Request for go-search-replace release info failed. Please try again later."
                 return
@@ -130,7 +130,7 @@ pre_install_actions:
             fi
 
             # Construct the download URL using the latest tag
-            download_url="https://github.com/nickchomey/go-search-replace/releases/download/${latest_tag}/go-search-replace_${formatted_tag}_${OS}_${ARCH}.tar.gz"
+            download_url="https://github.com/Automattic/go-search-replace/releases/download/${latest_tag}/go-search-replace_${formatted_tag}_${OS}_${ARCH}.tar.gz"
 
             echo "
         Downloading go-search-replace ${latest_tag} for ${OS}_${ARCH}... from $download_url"
