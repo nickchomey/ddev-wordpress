@@ -15,14 +15,14 @@ If you would like to set other environment configs, you can set WP_ENVIRONMENT_T
 
 $env_type = getenv("WP_ENVIRONMENT_TYPE") ?: "production";
 
-$environment_settings = dirname(__FILE__) . "/wp-config-$env_type.php";
-if (is_readable($environment_settings)) {
-    require_once($environment_settings);
+$environment_config = dirname(__FILE__) . "/wp-config-$env_type.php";
+if (is_readable($environment_config)) {
+    require_once($environment_config);
 } else {
     // exit the request until the environment_type and config files are set up appropriately
 
     http_response_code(500);
-    echo ("No $environment_settings file found. Look at wp-config.php and create a wp-config-$env_type.php file, and set the WP_ENVIRONMENT_TYPE.");
+    echo ("No $environment_config file found. Look at wp-config.php and create a wp-config-$env_type.php file, and set the WP_ENVIRONMENT_TYPE.");
     exit();
 }
 
